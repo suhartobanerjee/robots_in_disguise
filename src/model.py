@@ -135,3 +135,32 @@ class GBERT(nn.Module):
 
 
         return enc_output
+
+
+
+class CreateMask:
+    def __init__(self, prob = 0.15):
+        self.prob = prob
+        self.tokens_to_exclude = (1, 2)
+
+    def add_mask_token(self, input_data):
+        # Create a binary mask where 1 indicates masking and 0 indicates not masking
+        # The mask is sampled based on the mask probability
+        # excluding certain idx
+        mask = torch.bernoulli(torch.full(input_data.shape, self.prob)).bool()
+
+        # Set the masking probability to False for tokens to be excluded
+        torch.where(mask[input_data == self.tokens_to_exclude], False, input_data)
+        
+        masked_input_data = torch.where(mask, torch.tensor(103), input_data)
+
+
+        # Store the tokens that are being replaced
+        # also masked_indices
+        original_labels = input_data[mask]
+        masked_indices = torch.nonzero(mask.squeeze(0)).squeeze(1)
+
+
+
+        return (masked_input_data, original_labels, masked_indices)
+
