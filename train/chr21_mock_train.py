@@ -27,7 +27,7 @@ conf_str = ''.join(conf_pos)
 print((conf_str[1:10]))
 
 
-tokens = tokenizer(conf_str[1:200])
+tokens = tokenizer(conf_str[1:100])
 tokens_tensor = torch.tensor(tokens['input_ids']).unsqueeze(0)
 
 

@@ -92,16 +92,32 @@ class EncoderLayer(nn.Module):
 
 
 
+class MLMLayer(nn.Module):
+    def __init__(self, vocab_size, embed_dim):
+        super(MLMLayer, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.predictions = nn.Linear(embed_dim, vocab_size)
+
+    def forward(self, masked_input):
+        # Apply the embedding layer
+        embedded = self.embedding(masked_input)
+        # Apply the linear layer to predict token probabilities
+        predictions = self.predictions(embedded)
+        return predictions
+
+
+
+
 class GBERT(nn.Module):
     def __init__(self, 
-                 src_vocab_size,
+                 vocab_size,
                  embed_dim, num_heads,
                  num_layers,
                  ff_dim,
                  max_seq_length,
                  dropout):
         super(GBERT, self).__init__()
-        self.encoder_embedding = nn.Embedding(src_vocab_size, embed_dim)
+        self.encoder_embedding = nn.Embedding(vocab_size, embed_dim)
         self.positional_encoding = PositionalEncoding(embed_dim, max_seq_length)
 
         self.encoder_layers = nn.ModuleList([EncoderLayer(embed_dim, num_heads, ff_dim, dropout) for _ in range(num_layers)])
