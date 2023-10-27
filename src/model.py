@@ -97,18 +97,23 @@ class MLMLayer(nn.Module):
         super(MLMLayer, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim)
         self.predictions = nn.Linear(embed_dim, vocab_size)
+        self.softmax_layer = nn.Softmax(dim = -1)
 
     def forward(self, masked_input):
         # Apply the embedding layer
         embedded = self.embedding(masked_input)
         # Apply the linear layer to predict token probabilities
-        predictions = self.predictions(embedded)
-        return predictions
+        preds = self.predictions(embedded)
+        softmax_output = self.softmax_layer(preds)
+        preds_output = torch.argmax(softmax_output, dim=-1)
+
+
+        return (softmax_output, preds, preds_output)
 
 
 
 
-class GBERT(nn.Module):
+class GGBERT(nn.Module):
     def __init__(self, 
                  vocab_size,
                  embed_dim, num_heads,
@@ -116,7 +121,7 @@ class GBERT(nn.Module):
                  ff_dim,
                  max_seq_length,
                  dropout):
-        super(GBERT, self).__init__()
+        super(GGBERT, self).__init__()
         self.encoder_embedding = nn.Embedding(vocab_size, embed_dim)
         self.positional_encoding = PositionalEncoding(embed_dim, max_seq_length)
 
@@ -127,7 +132,6 @@ class GBERT(nn.Module):
 
     def forward(self, src):
         src_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(src)))
-        print((src_embedded))
 
         enc_output = src_embedded
         for enc_layer in self.encoder_layers:
@@ -155,12 +159,12 @@ class CreateMask:
         masked_input_data = torch.where(mask, torch.tensor(103), input_data)
 
 
-        # Store the tokens that are being replaced
-        # also masked_indices
-        original_labels = input_data[mask]
-        masked_indices = torch.nonzero(mask.squeeze(0)).squeeze(1)
+        # target labels will be of same shape of input_data
+        # just the mask loci will be original labels
+        # everything else will be -100
+        target_labels = torch.where(mask, input_data, torch.tensor(-100))
 
 
 
-        return (masked_input_data, original_labels, masked_indices)
+        return (masked_input_data, target_labels)
 

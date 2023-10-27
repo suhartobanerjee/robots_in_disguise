@@ -25,10 +25,9 @@ print("\n")
 
 
 mask = model.CreateMask()
-masked_seq, original_labels, masked_indices = mask.add_mask_token(tokens_tensor)
+masked_seq, target_labels = mask.add_mask_token(tokens_tensor)
 
 
 print(masked_seq)
 print("\n")
-print(original_labels)
-print(masked_indices)
+print(target_labels)
