@@ -96,19 +96,17 @@ class MLMLayer(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super(MLMLayer, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim)
-        self.predictions = nn.Linear(embed_dim, vocab_size)
-        self.softmax_layer = nn.Softmax(dim = -1)
+        self.pred_layer = nn.Linear(embed_dim, vocab_size)
 
     def forward(self, masked_input):
         # Apply the embedding layer
         embedded = self.embedding(masked_input)
         # Apply the linear layer to predict token probabilities
-        preds = self.predictions(embedded)
-        softmax_output = self.softmax_layer(preds)
-        preds_output = torch.argmax(softmax_output, dim=-1)
+        preds = self.pred_layer(embedded)
+        pred_label = torch.argmax(preds, dim=-1)
 
 
-        return (softmax_output, preds, preds_output)
+        return (preds, pred_label)
 
 
 
