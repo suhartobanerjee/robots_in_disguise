@@ -143,7 +143,7 @@ class GGBERT(nn.Module):
 class CreateMask:
     def __init__(self, prob = 0.15):
         self.prob = prob
-        self.tokens_to_exclude = (1, 2)
+        self.tokens_to_exclude = (1, 2, 104)
 
     def add_mask_token(self, input_data):
         # Create a binary mask where 1 indicates masking and 0 indicates not masking

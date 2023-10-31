@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
 import model
+import logging
 
 
 
@@ -30,7 +31,7 @@ class Train():
 
         # class specific data
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.enc_output_list = []
+        #self.enc_output_list = []
         self.mlm_loss_batch = 0
 
         # initialising the models
@@ -41,8 +42,8 @@ class Train():
                                  self.ff_dim,
                                  self.max_seq_len,
                                  self.dropout)
-        self.gbert = nn.DataParallel(self.gbert, device_ids=[0,1])
-        self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim)
+        self.gbert = nn.DataParallel(self.gbert, device_ids=[0,1]).to(self.device)
+        self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim).to(self.device)
 
         # setting the optimizer and setting the model to train.
         self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.5)
@@ -51,30 +52,26 @@ class Train():
 
 
     def training_cycle(self, data):
-        assert torch.cuda.is_available(), "Cannot see CUDA devices. Please check"
+        #assert torch.cuda.is_available(), "Cannot see CUDA devices. Please check"
         print(f"CUDA devices : {self.device}")
+        loader = DataLoader(data, batch_size = self.batch_size, shuffle = False)
 
 
         for epoch in range(self.n_epochs):
-            data_loader = DataLoader(data, batch_size = self.batch_size, shuffle = True)
-            print(len(data_loader))
-                
 
-
-            for batch in data_loader:
-                input_data = batch[0]
-                print(input_data.size())
-                input_data = input_data.unsqueeze(0).to(self.device)
+            for batch in loader:
+                input_data = batch
+                input_data = input_data.to(self.device)
 
                 # iteration of the model
-                output = self.gbert.to(self.device).forward(input_data)
-                self.enc_output_list.append((output))
+                enc_output = self.gbert.forward(input_data)
+                #self.enc_output_list.append((output))
                 
                 # MLM Preds.
                 # masking, feeding through MLM layer and calc loss
                 mask = model.CreateMask()
                 masked_input_ids, target_labels = mask.add_mask_token(input_data)
-                mlm_predictions, pred_labels = self.mlm_layer(masked_input_ids.to(self.device)).to(self.device)
+                mlm_predictions, pred_labels = self.mlm_layer(masked_input_ids.to(self.device))
                 mlm_loss = self.loss_func(mlm_predictions.view(-1, self.vocab_size),
                                            target_labels.view(-1))
 
@@ -89,8 +86,8 @@ class Train():
                 self.mlm_loss_batch += mlm_loss.item()
 
 
-            print(f"Epoch: {epoch+1}, Avg_Loss: {self.mlm_loss_batch / len((data_loader))}")
+            logging.info(f"Epoch: {epoch+1}, Avg_Loss: {self.mlm_loss_batch / len(loader)}")
             self.mlm_loss_batch = 0
 
         # finally return the enc outputs of all the outputs.
-        return self.enc_output_list
+        return enc_output

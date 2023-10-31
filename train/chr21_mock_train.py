@@ -4,37 +4,42 @@ import train
 import gzip
 from transformers import AutoTokenizer, AutoModel
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
+import logging
 
 
+# logging config
+logging.basicConfig(level=logging.INFO)
 
 
 model_name = 'gena-lm-bert-base'
 tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
+logging.info("Tokenizer downloaded!")
 
 
 with gzip.open("../data/chr21.txt.gz", 'rb') as target:
     data = str(target.read())
+logging.info("Chromosome file read!")
 
 
 # picking up the conf calls only
 conf_pos = list(filter(lambda c: c.isupper(), data))
-conf_str = ''.join(conf_pos[0:100])
-
+conf_str = ''.join(conf_pos[0:200000])
+logging.info("Chromosome file processed!")
 
 
 
 # TRAINING AREA
 # variables for training.
 vocab_size = len(tokenizer)
-embed_dim = 256
-n_heads = 8
-n_layers = 12
+embed_dim = 10
+n_heads = 2
+n_layers = 2
 ff_dim = 256
-max_seq_len = 20
+max_seq_len = 100
 dropout = 0.1
 batch_size = 16
-n_epochs = 100
+n_epochs = 15
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,
@@ -58,19 +63,43 @@ def add_padding(seq_chunk):
 
 chunked_seq = [conf_str[i:i+max_seq_len] for i in range(0, len(conf_str), max_seq_len)]
 
+# tokenise the entire seq
+tokens = tokenizer(conf_str)
+# chunk the tokens list [input_ids] into sublists
+# with max len == max_seq_len
+chunked_tokens = [tokens['input_ids'][i:i + max_seq_len] for i in range(0, len(tokens['input_ids']), max_seq_len)]
 
-tokens = [tokenizer(chunk) for chunk in chunked_seq]
-tokens = [chunk['input_ids'] for chunk in tokens]
+# tokenising the chunked seq into a 2d array
+#tokens = [tokenizer(chunk) for chunk in chunked_seq]
+#tokens = [chunk['input_ids'] for chunk in tokens]
 
 # padding seq which have less than max_seq_len
-tokens = list(map(add_padding, tokens))
+padded_tokens = list(map(add_padding, chunked_tokens))
 
-tokens_tensor = torch.tensor(tokens)
-print(tokens_tensor.size())
 
-data_loader = []
-for seq in tokens_tensor:
-    data_loader.extend(DataLoader(seq, batch_size = batch_size, shuffle = True))
-print(len(data_loader))
-print(data_loader)
-#train_model.training_cycle(data = tokens_tensor)
+# converting into tensor.
+tokens_tensor = torch.tensor(padded_tokens)
+
+
+class GenomeSequences(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+    def show(self):
+        return self.data
+
+    def size(self):
+        return self.data.size()
+
+gen_seq = GenomeSequences(tokens_tensor)
+logging.info("Dataset processed! Beginning training ...")
+
+
+enc_output = train_model.training_cycle(data = gen_seq)
+print(enc_output.size())
