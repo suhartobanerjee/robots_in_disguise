@@ -24,7 +24,7 @@ logging.info("Chromosome file read!")
 
 # picking up the conf calls only
 conf_pos = list(filter(lambda c: c.isupper(), data))
-conf_str = ''.join(conf_pos[0:200000])
+conf_str = ''.join(conf_pos[10000:10200])
 logging.info("Chromosome file processed!")
 
 
@@ -36,10 +36,10 @@ embed_dim = 10
 n_heads = 2
 n_layers = 2
 ff_dim = 256
-max_seq_len = 100
+max_seq_len = 50
 dropout = 0.1
 batch_size = 16
-n_epochs = 15
+n_epochs = 5000
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,
@@ -56,7 +56,7 @@ train_model = train.Train(vocab_size = vocab_size,
 def add_padding(seq_chunk):
     if len(seq_chunk) < max_seq_len:
         pad_len = max_seq_len - len(seq_chunk)
-        seq_chunk.extend(pad_len * [104])
+        seq_chunk.extend(pad_len * [3])
 
     return seq_chunk
 
@@ -102,4 +102,4 @@ logging.info("Dataset processed! Beginning training ...")
 
 
 enc_output = train_model.training_cycle(data = gen_seq)
-print(enc_output.size())
+logging.info(f"Encoder output shape {enc_output.size()}")

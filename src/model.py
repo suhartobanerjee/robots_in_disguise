@@ -143,7 +143,7 @@ class GGBERT(nn.Module):
 class CreateMask:
     def __init__(self, prob = 0.15):
         self.prob = prob
-        self.tokens_to_exclude = (1, 2, 104)
+        self.tokens_to_exclude = (1, 2, 3)
 
     def add_mask_token(self, input_data):
         # Create a binary mask where 1 indicates masking and 0 indicates not masking
@@ -154,7 +154,7 @@ class CreateMask:
         # Set the masking probability to False for tokens to be excluded
         torch.where(mask[input_data == self.tokens_to_exclude], False, input_data)
         
-        masked_input_data = torch.where(mask, torch.tensor(103), input_data)
+        masked_input_data = torch.where(mask, torch.tensor(4), input_data)
 
 
         # target labels will be of same shape of input_data
