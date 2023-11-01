@@ -46,7 +46,7 @@ class Train():
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim).to(self.device)
 
         # setting the optimizer and setting the model to train.
-        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.5)
+        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.1)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
@@ -74,6 +74,7 @@ class Train():
                 mlm_predictions, pred_labels = self.mlm_layer(masked_input_ids.to(self.device))
                 mlm_loss = self.loss_func(mlm_predictions.view(-1, self.vocab_size),
                                            target_labels.view(-1))
+                logging.debug(f"The original labels : \n{masked_input_ids}\nThe pred_labels are : \n{pred_labels}")
 
                 # Zero the gradients
                 self.optimizer.zero_grad()
