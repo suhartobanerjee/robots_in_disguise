@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#$ -l gpu=2
+#$ -l gpu=4
 #$ -l h=maxg07
 #$ -l m_mem_free=64G
 #$ -l cuda_name=Tesla-V100-SXM2-32GB
@@ -8,11 +8,18 @@
 #$ -o /fast/AG_Sanders/suharto/robots_in_disguise/logs/log_$JOB_ID.txt
 #$ -e /fast/AG_Sanders/suharto/robots_in_disguise/logs/log_$JOB_ID.txt
 
-cd /fast/AG_Sanders/suharto/robots_in_disguise/train/
+ROOT_DIR=/fast/AG_Sanders/suharto/robots_in_disguise
+
+# moving the previous log to archive and getting back to train folder
+cd $ROOT_DIR/logs/
+
+curr_log="*"$JOB_ID"*"
+find . -maxdepth 1 -type f -not -name $curr_log -exec mv {} archive/. \;
+cd $ROOT_DIR/train
 
 source ~/.bashrc
 conda activate pytorch
-printf "Conda env activated at : %s" $CONDA_DEFAULT_ENV
+printf "Conda env activated at : %s\n" $CONDA_DEFAULT_ENV
 
 
-python chr21_mock_train.py
+time python chr21_mock_train.py

@@ -31,7 +31,6 @@ class Train():
 
         # class specific data
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #self.enc_output_list = []
         self.mlm_loss_batch = 0
 
         # initialising the models
@@ -42,19 +41,25 @@ class Train():
                                  self.ff_dim,
                                  self.max_seq_len,
                                  self.dropout)
-        self.gbert = nn.DataParallel(self.gbert, device_ids=[0,1]).to(self.device)
+        self.n_gpus = torch.cuda.device_count()
+        self.gbert = nn.DataParallel(self.gbert,
+                                     device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim).to(self.device)
+        self.mlm_layer = nn.DataParallel(self.mlm_layer,
+                                         device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
 
         # setting the optimizer and setting the model to train.
         self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.1)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
-
     def training_cycle(self, data):
         assert torch.cuda.is_available(), "Cannot see CUDA devices. Please check"
+
         logging.info(f"Device : {self.device}")
-        logging.info(f"Number of CUDA devices : {torch.cuda.device_count()}")
+        logging.info(f"Number of CUDA devices : {self.n_gpus}")
+
+        # batching the data
         loader = DataLoader(data, batch_size = self.batch_size, shuffle = False)
 
 
@@ -66,7 +71,6 @@ class Train():
 
                 # iteration of the model
                 enc_output = self.gbert.forward(input_data)
-                #self.enc_output_list.append((output))
                 
                 # MLM Preds.
                 # masking, feeding through MLM layer and calc loss
