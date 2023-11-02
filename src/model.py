@@ -143,18 +143,21 @@ class GGBERT(nn.Module):
 class CreateMask:
     def __init__(self, prob = 0.15):
         self.prob = prob
-        self.tokens_to_exclude = (1, 2, 3)
+        self.tokens_to_exclude = torch.tensor([1, 2, 3]).to("cuda")
 
     def add_mask_token(self, input_data):
         # Create a binary mask where 1 indicates masking and 0 indicates not masking
         # The mask is sampled based on the mask probability
         # excluding certain idx
-        mask = torch.bernoulli(torch.full(input_data.shape, self.prob)).bool()
+        mask = torch.bernoulli(torch.full(input_data.shape, self.prob)).bool().to("cuda")
 
         # Set the masking probability to False for tokens to be excluded
-        torch.where(mask[input_data == self.tokens_to_exclude], False, input_data)
+        # Create a boolean mask for tokens to exclude
+        mask_to_exclude = torch.isin(input_data, tokens_to_exclude)
+        # Set the value of mask to False where the condition is True
+        mask = torch.where(mask_to_exclude, False, mask)
         
-        masked_input_data = torch.where(mask, torch.tensor(4), input_data)
+        masked_input_data = torch.where(mask, torch.tensor(4), input_data).to("cuda")
 
 
         # target labels will be of same shape of input_data
