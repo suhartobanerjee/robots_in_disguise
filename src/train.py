@@ -52,8 +52,9 @@ class Train():
 
 
     def training_cycle(self, data):
-        #assert torch.cuda.is_available(), "Cannot see CUDA devices. Please check"
-        print(f"CUDA devices : {self.device}")
+        assert torch.cuda.is_available(), "Cannot see CUDA devices. Please check"
+        logging.info(f"Device : {self.device}")
+        logging.info(f"Number of CUDA devices : {torch.cuda.device_count()}")
         loader = DataLoader(data, batch_size = self.batch_size, shuffle = False)
 
 

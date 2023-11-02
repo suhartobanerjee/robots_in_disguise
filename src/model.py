@@ -153,7 +153,7 @@ class CreateMask:
 
         # Set the masking probability to False for tokens to be excluded
         # Create a boolean mask for tokens to exclude
-        mask_to_exclude = torch.isin(input_data, tokens_to_exclude)
+        mask_to_exclude = torch.isin(input_data, self.tokens_to_exclude)
         # Set the value of mask to False where the condition is True
         mask = torch.where(mask_to_exclude, False, mask)
         
