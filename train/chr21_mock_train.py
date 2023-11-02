@@ -9,7 +9,7 @@ import logging
 
 
 # logging config
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 model_name = 'gena-lm-bert-base'
@@ -39,7 +39,7 @@ ff_dim = 256
 max_seq_len = 50
 dropout = 0.1
 batch_size = 16
-n_epochs = 5000
+n_epochs = 50
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,
