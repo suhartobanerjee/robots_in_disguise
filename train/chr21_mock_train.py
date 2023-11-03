@@ -9,7 +9,7 @@ import logging
 
 
 # logging config
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 model_name = 'gena-lm-bert-base'
@@ -24,7 +24,7 @@ logging.info("Chromosome file read!")
 
 # picking up the conf calls only
 conf_pos = list(filter(lambda c: c.isupper(), data))
-conf_str = ''.join(conf_pos[10000:10200])
+conf_str = ''.join(conf_pos)
 logging.info("Chromosome file processed!")
 
 
@@ -32,14 +32,14 @@ logging.info("Chromosome file processed!")
 # TRAINING AREA
 # variables for training.
 vocab_size = len(tokenizer)
-embed_dim = 10
-n_heads = 2
-n_layers = 2
-ff_dim = 256
-max_seq_len = 50
+embed_dim = 256
+n_heads = 8
+n_layers = 6
+ff_dim = 512
+max_seq_len = 100
 dropout = 0.1
-batch_size = 16
-n_epochs = 50
+batch_size = 64
+n_epochs = 20
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,

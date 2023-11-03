@@ -49,7 +49,7 @@ class Train():
                                          device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
 
         # setting the optimizer and setting the model to train.
-        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.1)
+        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.003)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
