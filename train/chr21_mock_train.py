@@ -32,13 +32,13 @@ logging.info("Chromosome file processed!")
 # TRAINING AREA
 # variables for training.
 vocab_size = len(tokenizer)
-embed_dim = 512
+embed_dim = 256
 n_heads = 8
-n_layers = 12
-ff_dim = 2048
+n_layers = 6
+ff_dim = 512
 max_seq_len = 100
 dropout = 0.1
-batch_size = 128
+batch_size = 64
 n_epochs = 20
 
 train_model = train.Train(vocab_size = vocab_size,

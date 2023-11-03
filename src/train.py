@@ -46,7 +46,7 @@ class Train():
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim).to(self.device)
 
         # setting the optimizer and setting the model to train.
-        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.1)
+        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.003)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
