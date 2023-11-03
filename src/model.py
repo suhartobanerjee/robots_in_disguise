@@ -78,7 +78,7 @@ class EncoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.feed_forward = nn.Sequential(
             nn.Linear(embed_dim, ff_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(ff_dim, embed_dim)
         )
         
@@ -95,14 +95,14 @@ class EncoderLayer(nn.Module):
 class MLMLayer(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super(MLMLayer, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        #self.embedding = nn.Embedding(vocab_size, embed_dim)
         self.pred_layer = nn.Linear(embed_dim, vocab_size)
 
-    def forward(self, masked_input):
+    def forward(self, enc_output):
         # Apply the embedding layer
-        embedded = self.embedding(masked_input)
+        #embedded = self.embedding(masked_input)
         # Apply the linear layer to predict token probabilities
-        preds = self.pred_layer(embedded)
+        preds = self.pred_layer(enc_output)
         pred_label = torch.argmax(preds, dim=-1)
 
 

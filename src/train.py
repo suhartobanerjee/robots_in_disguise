@@ -44,12 +44,13 @@ class Train():
         self.n_gpus = torch.cuda.device_count()
         self.gbert = nn.DataParallel(self.gbert,
                                      device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
-        self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim).to(self.device)
+        self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim)
         self.mlm_layer = nn.DataParallel(self.mlm_layer,
                                          device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
 
         # setting the optimizer and setting the model to train.
-        self.optimizer = optim.Adam(self.gbert.parameters(), lr = 0.003)
+        self.optimizer = optim.Adam([{'params': self.gbert.parameters()},
+                                     {'params': self.mlm_layer.parameters()}], lr = 0.003)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
@@ -76,7 +77,7 @@ class Train():
                 # masking, feeding through MLM layer and calc loss
                 mask = model.CreateMask()
                 masked_input_ids, target_labels = mask.add_mask_token(input_data)
-                mlm_predictions, pred_labels = self.mlm_layer(masked_input_ids.to(self.device))
+                mlm_predictions, pred_labels = self.mlm_layer(enc_output)
                 mlm_loss = self.loss_func(mlm_predictions.view(-1, self.vocab_size),
                                            target_labels.view(-1))
                 logging.debug(f"The original labels : \n{masked_input_ids}\nThe pred_labels are : \n{pred_labels}")

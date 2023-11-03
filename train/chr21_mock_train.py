@@ -9,7 +9,7 @@ import logging
 
 
 # logging config
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format = "%(asctime)s %(levelname)s: %(message)s")
 
 
 model_name = 'gena-lm-bert-base'
@@ -32,14 +32,14 @@ logging.info("Chromosome file processed!")
 # TRAINING AREA
 # variables for training.
 vocab_size = len(tokenizer)
-embed_dim = 256
+embed_dim = 64
 n_heads = 8
 n_layers = 6
 ff_dim = 512
 max_seq_len = 100
 dropout = 0.1
 batch_size = 64
-n_epochs = 20
+n_epochs = 30
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,
@@ -51,6 +51,9 @@ train_model = train.Train(vocab_size = vocab_size,
                           n_epochs = n_epochs,
                           batch_size = batch_size)
 
+
+# logging the hyperparameters
+logging.info(f"The hyperparameters are : \n1. vocab_size : {vocab_size},\n2. embed_dim : {embed_dim},\n3. n_heads : {n_heads},\n4. n_layers : {n_layers},\n5. ff_dim : {ff_dim},\n6. max_seq_len : {max_seq_len},\n7. dropout : {dropout},\n8. batch_size : {batch_size},\n9. n_epochs : {n_epochs},\n")
 
 # padding seq
 def add_padding(seq_chunk):
