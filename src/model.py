@@ -141,7 +141,7 @@ class GGBERT(nn.Module):
 
 
 class CreateMask:
-    def __init__(self, prob = 0.05):
+    def __init__(self, prob = 0.15):
         self.prob = prob
         self.tokens_to_exclude = torch.tensor([1, 2, 3]).to("cuda")
 
