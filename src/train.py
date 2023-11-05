@@ -2,7 +2,6 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import torch.nn as nn
-import torch.nn.functional as F
 import model
 import logging
 
@@ -50,7 +49,8 @@ class Train():
 
         # setting the optimizer and setting the model to train.
         self.optimizer = optim.Adam([{'params': self.gbert.parameters()},
-                                     {'params': self.mlm_layer.parameters()}], lr = 0.003)
+                                     {'params': self.mlm_layer.parameters()}],
+                                    lr = 0.001, amsgrad = True)
         self.loss_func = nn.CrossEntropyLoss(ignore_index = -100)
         self.gbert.train()
 
