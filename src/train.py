@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import model
 import logging
+import numpy as np
 
 
 
@@ -40,7 +41,7 @@ class Train():
                                  self.ff_dim,
                                  self.max_seq_len,
                                  self.dropout)
-        self.n_gpus = torch.cuda.device_count()
+        self.n_gpus = 2#torch.cuda.device_count()
         self.gbert = nn.DataParallel(self.gbert,
                                      device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim)
@@ -62,6 +63,8 @@ class Train():
 
         # batching the data
         loader = DataLoader(data, batch_size = self.batch_size, shuffle = False)
+        enc_output_list = []
+        master_enc_output = torch.from_numpy(np.array([[[]]])).to(self.device)
 
 
         for epoch in range(self.n_epochs):
@@ -72,6 +75,7 @@ class Train():
 
                 # iteration of the model
                 enc_output = self.gbert.forward(input_data)
+                enc_output_list.append(enc_output)
                 
                 # MLM Preds.
                 # masking, feeding through MLM layer and calc loss
@@ -96,5 +100,10 @@ class Train():
             logging.info(f"Epoch: {epoch+1}, Avg_Loss: {self.mlm_loss_batch / len(loader)}")
             self.mlm_loss_batch = 0
 
+            if (epoch + 1) == self.n_epochs:
+                master_enc_output = torch.cat(enc_output_list, dim=0)
+            else:
+                enc_output_list = []
+
         # finally return the enc outputs of all the outputs.
-        return enc_output
+        return master_enc_output

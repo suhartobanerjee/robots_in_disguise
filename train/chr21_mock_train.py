@@ -6,6 +6,9 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 from torch.utils.data import Dataset, DataLoader
 import logging
+import umap
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 # logging config
@@ -17,7 +20,7 @@ tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
 logging.info("Tokenizer downloaded!")
 
 
-with gzip.open("../data/chr21.txt.gz", 'rb') as target:
+with gzip.open("../data/chr19.txt.gz", 'rb') as target:
     data = str(target.read())
 logging.info("Chromosome file read!")
 
@@ -36,10 +39,10 @@ embed_dim = 64
 n_heads = 8
 n_layers = 6
 ff_dim = 512
-max_seq_len = 100
+max_seq_len = 512
 dropout = 0.1
-batch_size = 64
-n_epochs = 30
+batch_size = 32
+n_epochs = 5
 
 train_model = train.Train(vocab_size = vocab_size,
                           embed_dim = embed_dim,
@@ -64,13 +67,29 @@ def add_padding(seq_chunk):
     return seq_chunk
 
 
-chunked_seq = [conf_str[i:i+max_seq_len] for i in range(0, len(conf_str), max_seq_len)]
+#chunked_seq = [conf_str[i:i+max_seq_len] for i in range(0, len(conf_str), max_seq_len)]
+#tokenise all the chunks
 
 # tokenise the entire seq
 tokens = tokenizer(conf_str)
+tokens = tokens['input_ids']
+
+# removing the 1 and 2 tokens from the seq
+tokens.remove(1)
+tokens.remove(2)
+#tokens = tokens.pop(0)
+#tokens = tokens.pop(len(tokens))
+
 # chunk the tokens list [input_ids] into sublists
 # with max len == max_seq_len
-chunked_tokens = [tokens['input_ids'][i:i + max_seq_len] for i in range(0, len(tokens['input_ids']), max_seq_len)]
+# doing till max-seq-len -2
+chunked_tokens = [tokens[i:i + (max_seq_len - 2)] for i in range(0, len(tokens), (max_seq_len - 2))]
+
+# inserting 1 and 2 tokens at the start / end
+[chunk.insert(0, 1) for chunk in chunked_tokens]
+[chunk.append(2) for chunk in chunked_tokens]
+
+
 
 # tokenising the chunked seq into a 2d array
 #tokens = [tokenizer(chunk) for chunk in chunked_seq]
@@ -78,7 +97,7 @@ chunked_tokens = [tokens['input_ids'][i:i + max_seq_len] for i in range(0, len(t
 
 # padding seq which have less than max_seq_len
 padded_tokens = list(map(add_padding, chunked_tokens))
-
+#padded_tokens = chunked_tokens
 
 # converting into tensor.
 tokens_tensor = torch.tensor(padded_tokens)
@@ -102,7 +121,35 @@ class GenomeSequences(Dataset):
 
 gen_seq = GenomeSequences(tokens_tensor)
 logging.info("Dataset processed! Beginning training ...")
+logging.info(f"Input data shape : {gen_seq.size()}")
 
 
 enc_output = train_model.training_cycle(data = gen_seq)
 logging.info(f"Encoder output shape {enc_output.size()}")
+
+
+# taking the hidden dims
+enc_output_cpu = enc_output.cpu()
+hidden_dims = enc_output_cpu.detach().numpy()
+
+# saving the encoder output to disk
+f = gzip.GzipFile("../proc/chr19_embed_dims.npy.gz", "w")
+np.save(file=f,
+        arr=hidden_dims)
+f.close()
+
+
+#hidden_dims = hidden_dims.flatten()
+logging.info("Retrieved hidden dims!")
+
+# performing umap red
+#umap_red = umap.UMAP()
+#umap_emb = umap_red.fit_transform(hidden_dims)
+#logging.info("UMAP fitted!")
+#
+#logging.info("Plotting UMAP and saving plot...")
+## plotting umap
+#fig = plt.figure()
+#plt.scatter(umap_emb[:, 0], umap_emb[:, 1])
+#plt.title("UMAP Projection")
+#fig.savefig("../plots/umap.pdf")
