@@ -1,2 +1,6 @@
 *__pycache__*
 data/
+.jupyter_logs/
+logs/
+notebooks/.ipynb_checkpoints/
+proc/

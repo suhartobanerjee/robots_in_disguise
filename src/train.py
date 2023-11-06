@@ -41,7 +41,7 @@ class Train():
                                  self.ff_dim,
                                  self.max_seq_len,
                                  self.dropout)
-        self.n_gpus = 2#torch.cuda.device_count()
+        self.n_gpus = torch.cuda.device_count()
         self.gbert = nn.DataParallel(self.gbert,
                                      device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim)

@@ -20,15 +20,21 @@ tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
 logging.info("Tokenizer downloaded!")
 
 
-with gzip.open("../data/chr19.txt.gz", 'rb') as target:
-    data = str(target.read())
-logging.info("Chromosome file read!")
+def read_chr_data(chr_id: str) -> str:
+    with gzip.open(f"../data/chr{chr_id}.txt.gz", 'rb') as target:
+        data = str(target.read())
+    logging.info("Chromosome file read!")
+
+    # picking up the conf calls only
+    conf_pos = list(filter(lambda c: c.isupper(), data))
+    conf_str = ''.join(conf_pos)
+    logging.info("Chromosome file processed!")
+    return conf_str
 
 
-# picking up the conf calls only
-conf_pos = list(filter(lambda c: c.isupper(), data))
-conf_str = ''.join(conf_pos)
-logging.info("Chromosome file processed!")
+chr_to_read = ["19", "21"]
+conf_str = "".join(list(map(lambda chr_id: read_chr_data(chr_id), chr_to_read)))
+
 
 
 
