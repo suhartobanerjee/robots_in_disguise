@@ -9,10 +9,15 @@ import logging
 import umap
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
 # logging config
-logging.basicConfig(level=logging.INFO, format = "%(asctime)s %(levelname)s: %(message)s")
+logging.basicConfig(level=logging.DEBUG, format = "%(asctime)s %(levelname)s: %(message)s")
+
+# setting the CUDA_VISIBLE_DEVICES
+os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['GPUS']
+logging.debug(os.environ['CUDA_VISIBLE_DEVICES'])
 
 
 model_name = 'gena-lm-bert-base'
@@ -23,17 +28,17 @@ logging.info("Tokenizer downloaded!")
 def read_chr_data(chr_id: str) -> str:
     with gzip.open(f"../data/chr{chr_id}.txt.gz", 'rb') as target:
         data = str(target.read())
-    logging.info("Chromosome file read!")
+    logging.info(f"Chromosome file read: chr{chr_id}!")
 
     # picking up the conf calls only
-    conf_pos = list(filter(lambda c: c.isupper(), data))
-    conf_str = ''.join(conf_pos)
-    logging.info("Chromosome file processed!")
+    conf_str = "".join([x for x in data if x.isupper()])
+    logging.info(f"Chromosome file processed: chr{chr_id}!")
     return conf_str
 
 
 chr_to_read = ["19", "21"]
-conf_str = "".join(list(map(lambda chr_id: read_chr_data(chr_id), chr_to_read)))
+conf_str = "".join([read_chr_data(chr) for chr in chr_to_read])
+#conf_str = "".join(list(map(read_chr_data, chr_to_read)))
 
 
 
@@ -50,19 +55,20 @@ dropout = 0.1
 batch_size = 32
 n_epochs = 5
 
-train_model = train.Train(vocab_size = vocab_size,
-                          embed_dim = embed_dim,
-                          n_heads = n_heads,
-                          n_layers = n_layers,
-                          ff_dim = ff_dim,
-                          max_seq_len = max_seq_len,
-                          dropout = dropout,
-                          n_epochs = n_epochs,
-                          batch_size = batch_size)
+train_model = train.Train(vocab_size=vocab_size,
+                          embed_dim=embed_dim,
+                          n_heads=n_heads,
+                          n_layers=n_layers,
+                          ff_dim=ff_dim,
+                          max_seq_len=max_seq_len,
+                          dropout=dropout,
+                          n_epochs=n_epochs,
+                          batch_size=batch_size)
 
 
 # logging the hyperparameters
 logging.info(f"The hyperparameters are : \n\n1. vocab_size : {vocab_size},\n2. embed_dim : {embed_dim},\n3. n_heads : {n_heads},\n4. n_layers : {n_layers},\n5. ff_dim : {ff_dim},\n6. max_seq_len : {max_seq_len},\n7. dropout : {dropout},\n8. batch_size : {batch_size},\n9. n_epochs : {n_epochs},\n")
+
 
 # padding seq
 def add_padding(seq_chunk):
@@ -139,7 +145,7 @@ enc_output_cpu = enc_output.cpu()
 hidden_dims = enc_output_cpu.detach().numpy()
 
 # saving the encoder output to disk
-f = gzip.GzipFile("../proc/chr19_embed_dims.npy.gz", "w")
+f = gzip.GzipFile("../proc/chr19_21_embed_dims.npy.gz", "w")
 np.save(file=f,
         arr=hidden_dims)
 f.close()

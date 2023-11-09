@@ -96,14 +96,14 @@ class MLMLayer(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super(MLMLayer, self).__init__()
         #self.embedding = nn.Embedding(vocab_size, embed_dim)
-        self.pred_layer = nn.Linear(embed_dim, vocab_size)
+        self.pred_layer = nn.Linear(embed_dim, vocab_size)#.to(f"cuda:{self.device_ids[0]}")
 
     def forward(self, enc_output):
         # Apply the embedding layer
         #embedded = self.embedding(masked_input)
         # Apply the linear layer to predict token probabilities
-        preds = self.pred_layer(enc_output)
-        pred_label = torch.argmax(preds, dim=-1)
+        preds = self.pred_layer(enc_output)#.to(f"cuda:{self.device_ids[0]}")
+        pred_label = torch.argmax(preds, dim=-1)#.to(f"cuda:{self.device_ids[0]}")
 
 
         return (preds, pred_label)
@@ -140,30 +140,33 @@ class GGBERT(nn.Module):
 
 
 
-class CreateMask:
-    def __init__(self, prob = 0.15):
+class CreateMask(nn.Module):
+    def __init__(self, prob):
+        super(CreateMask, self).__init__()
         self.prob = prob
-        self.tokens_to_exclude = torch.tensor([1, 2, 3]).to("cuda")
+        self.device = "cuda"
+        self.tokens_to_exclude = torch.tensor([1, 2, 3]).to(self.device)
 
     def add_mask_token(self, input_data):
         # Create a binary mask where 1 indicates masking and 0 indicates not masking
         # The mask is sampled based on the mask probability
         # excluding certain idx
-        mask = torch.bernoulli(torch.full(input_data.shape, self.prob)).bool().to("cuda")
+        mask = torch.bernoulli(torch.full(input_data.shape, self.prob)).bool().to(self.device)
 
         # Set the masking probability to False for tokens to be excluded
         # Create a boolean mask for tokens to exclude
-        mask_to_exclude = torch.isin(input_data, self.tokens_to_exclude)
+        mask_to_exclude = torch.isin(input_data, self.tokens_to_exclude).to(self.device)
+
         # Set the value of mask to False where the condition is True
-        mask = torch.where(mask_to_exclude, False, mask)
+        mask = torch.where(mask_to_exclude, False, mask).to(self.device)
         
-        masked_input_data = torch.where(mask, torch.tensor(4), input_data).to("cuda")
+        masked_input_data = torch.where(mask, torch.tensor(4), input_data).to(self.device)
 
 
         # target labels will be of same shape of input_data
         # just the mask loci will be original labels
         # everything else will be -100
-        target_labels = torch.where(mask, input_data, torch.tensor(-100))
+        target_labels = torch.where(mask, input_data, torch.tensor(-100)).to(self.device)
 
 
 

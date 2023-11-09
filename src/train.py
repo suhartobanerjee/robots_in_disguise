@@ -5,6 +5,7 @@ import torch.nn as nn
 import model
 import logging
 import numpy as np
+import os
 
 
 
@@ -43,10 +44,10 @@ class Train():
                                  self.dropout)
         self.n_gpus = torch.cuda.device_count()
         self.gbert = nn.DataParallel(self.gbert,
-                                     device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
+                                     device_ids = [gpu for gpu in range(self.n_gpus)]).to(self.device)
         self.mlm_layer = model.MLMLayer(self.vocab_size, self.embed_dim)
         self.mlm_layer = nn.DataParallel(self.mlm_layer,
-                                         device_ids = [x for x in range(0, self.n_gpus)]).to(self.device)
+                                         device_ids = [gpu for gpu in range(self.n_gpus)]).to(self.device)
 
         # setting the optimizer and setting the model to train.
         self.optimizer = optim.Adam([{'params': self.gbert.parameters()},
@@ -70,8 +71,7 @@ class Train():
         for epoch in range(self.n_epochs):
 
             for batch in loader:
-                input_data = batch
-                input_data = input_data.to(self.device)
+                input_data = batch.to(self.device)
 
                 # iteration of the model
                 enc_output = self.gbert.forward(input_data)
@@ -79,12 +79,12 @@ class Train():
                 
                 # MLM Preds.
                 # masking, feeding through MLM layer and calc loss
-                mask = model.CreateMask()
+                mask = model.CreateMask(prob=0.15)
                 masked_input_ids, target_labels = mask.add_mask_token(input_data)
                 mlm_predictions, pred_labels = self.mlm_layer(enc_output)
                 mlm_loss = self.loss_func(mlm_predictions.view(-1, self.vocab_size),
                                            target_labels.view(-1))
-                logging.debug(f"The original labels : \n{masked_input_ids}\nThe pred_labels are : \n{pred_labels}")
+                #logging.debug(f"The original labels : \n{masked_input_ids}\nThe pred_labels are : \n{pred_labels}")
 
                 # Zero the gradients
                 self.optimizer.zero_grad()
