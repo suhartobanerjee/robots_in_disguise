@@ -36,8 +36,8 @@ def read_chr_data(chr_id: str) -> str:
     return conf_str
 
 
-chr_to_read = ["19", "21"]
-conf_str = "".join([read_chr_data(chr) for chr in chr_to_read])
+chr_to_read = ["1", "19", "21"]
+conf_list = [read_chr_data(chr) for chr in chr_to_read]
 #conf_str = "".join(list(map(read_chr_data, chr_to_read)))
 
 
@@ -45,7 +45,7 @@ conf_str = "".join([read_chr_data(chr) for chr in chr_to_read])
 
 # TRAINING AREA
 # variables for training.
-vocab_size = len(tokenizer)
+vocab_size = len(tokenizer) + 25
 embed_dim = 64
 n_heads = 8
 n_layers = 6
@@ -53,7 +53,7 @@ ff_dim = 512
 max_seq_len = 512
 dropout = 0.1
 batch_size = 32
-n_epochs = 5
+n_epochs = 20
 
 train_model = train.Train(vocab_size=vocab_size,
                           embed_dim=embed_dim,
@@ -83,23 +83,49 @@ def add_padding(seq_chunk):
 #tokenise all the chunks
 
 # tokenise the entire seq
-tokens = tokenizer(conf_str)
-tokens = tokens['input_ids']
+tokens_list = [tokenizer(chr)["input_ids"] for chr in conf_list]
+
 
 # removing the 1 and 2 tokens from the seq
-tokens.remove(1)
-tokens.remove(2)
+for chr in tokens_list:
+    chr.remove(1)
+    chr.remove(2)
+#[tokens.remove(1) for tokens in tokens_list]
+#[tokens.remove(2) for tokens in tokens_list]
 #tokens = tokens.pop(0)
 #tokens = tokens.pop(len(tokens))
 
 # chunk the tokens list [input_ids] into sublists
 # with max len == max_seq_len
 # doing till max-seq-len -2
-chunked_tokens = [tokens[i:i + (max_seq_len - 2)] for i in range(0, len(tokens), (max_seq_len - 2))]
+def chunk_to_len(chr):
+    return [chr[i:i + (max_seq_len - 3)] for i in range(0, len(chr), (max_seq_len - 3))]
 
+chunked_tokens = [chunk_to_len(chr) for chr in tokens_list]
+
+labels = []
 # inserting 1 and 2 tokens at the start / end
-[chunk.insert(0, 1) for chunk in chunked_tokens]
-[chunk.append(2) for chunk in chunked_tokens]
+def add_special_tokens(chr, chr_id):
+    for chunk in chr:
+        chunk.insert(0, 1)
+        chunk.insert(1, 32_000 + int(chr_id))
+        chunk.append(2)
+        labels.append("chr" + chr_id)
+
+    return chr
+
+
+pre_proc_tokens = [add_special_tokens(chunked_tokens[i], chr_to_read[i]) for i in range(0, len(chunked_tokens))]
+
+# writing the labels to file
+with open("../proc/token_labels.txt", "w") as file:
+    file.write(str(labels))
+
+
+
+proc_tokens = []
+for chr in pre_proc_tokens:
+    proc_tokens += chr
 
 
 
@@ -108,7 +134,7 @@ chunked_tokens = [tokens[i:i + (max_seq_len - 2)] for i in range(0, len(tokens),
 #tokens = [chunk['input_ids'] for chunk in tokens]
 
 # padding seq which have less than max_seq_len
-padded_tokens = list(map(add_padding, chunked_tokens))
+padded_tokens = [add_padding(tokens) for tokens in proc_tokens]
 #padded_tokens = chunked_tokens
 
 # converting into tensor.
@@ -145,7 +171,7 @@ enc_output_cpu = enc_output.cpu()
 hidden_dims = enc_output_cpu.detach().numpy()
 
 # saving the encoder output to disk
-f = gzip.GzipFile("../proc/chr19_21_embed_dims.npy.gz", "w")
+f = gzip.GzipFile("../proc/chr1_19_21_embed_dims.npy.gz", "w")
 np.save(file=f,
         arr=hidden_dims)
 f.close()
