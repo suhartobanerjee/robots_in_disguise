@@ -10,6 +10,8 @@ import umap
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import multiprocessing as mp
+import random
 
 
 # logging config
@@ -17,12 +19,29 @@ logging.basicConfig(level=logging.DEBUG, format = "%(asctime)s %(levelname)s: %(
 
 # setting the CUDA_VISIBLE_DEVICES
 os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['GPUS']
+os.environ['TOKENIZERS_PARALLELISM'] = 'true'
 logging.debug(os.environ['CUDA_VISIBLE_DEVICES'])
+
+# mp n_cores
+n_cores = mp.cpu_count()
 
 
 model_name = 'gena-lm-bert-base'
 tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
 logging.info("Tokenizer downloaded!")
+
+
+def sample_nbp(seq: list, nbp: int) -> list:
+
+    # getting the edge_idx
+    # the logic is any random number between start and 
+    # edge_idx will be the start of the subset
+    # so that it always gives a valid subset
+    edge_idx = len(seq) - nbp
+    subset_start = random.sample(range(0, edge_idx), 1)[0]
+    subset_end = subset_start + nbp
+
+    return seq[subset_start:subset_end]
 
 
 def read_chr_data(chr_id: str) -> str:
@@ -31,13 +50,21 @@ def read_chr_data(chr_id: str) -> str:
     logging.info(f"Chromosome file read: chr{chr_id}!")
 
     # picking up the conf calls only
-    conf_str = "".join([x for x in data if x.isupper()])
+    conf_str = [x for x in data if x.isupper()]
+    conf_str = "".join(sample_nbp(conf_str, 10_000_000))
     logging.info(f"Chromosome file processed: chr{chr_id}!")
+    logging.info(f"Length of sequence = {len(conf_str)}")
     return conf_str
 
 
-chr_to_read = ["1", "19", "21"]
-conf_list = [read_chr_data(chr) for chr in chr_to_read]
+chr_to_read = [str(x) for x in range(1, 23)]
+#chr_to_read.append("X")
+#chr_to_read.append("Y")
+
+# parallelize
+with mp.Pool(processes=n_cores) as pool:
+    conf_list = pool.map(read_chr_data, chr_to_read)
+#conf_list = [read_chr_data(chr) for chr in chr_to_read]
 #conf_str = "".join(list(map(read_chr_data, chr_to_read)))
 
 
@@ -52,8 +79,8 @@ n_layers = 6
 ff_dim = 512
 max_seq_len = 512
 dropout = 0.1
-batch_size = 32
-n_epochs = 20
+batch_size = 16
+n_epochs = 10
 
 train_model = train.Train(vocab_size=vocab_size,
                           embed_dim=embed_dim,
@@ -83,7 +110,14 @@ def add_padding(seq_chunk):
 #tokenise all the chunks
 
 # tokenise the entire seq
-tokens_list = [tokenizer(chr)["input_ids"] for chr in conf_list]
+#tokens_list = [tokenizer(chr)["input_ids"] for chr in conf_list]
+
+# parallelize
+with mp.Pool(processes=n_cores) as pool:
+    tokens_list = pool.map(tokenizer, conf_list)
+
+tokens_list = [x["input_ids"] for x in tokens_list]
+logging.info("Sequence tokenized!")
 
 
 # removing the 1 and 2 tokens from the seq
@@ -171,23 +205,12 @@ enc_output_cpu = enc_output.cpu()
 hidden_dims = enc_output_cpu.detach().numpy()
 
 # saving the encoder output to disk
-f = gzip.GzipFile("../proc/chr1_19_21_embed_dims.npy.gz", "w")
+f = gzip.GzipFile("../proc/all_chr_random_subset_embed_dims.npy.gz", "w")
 np.save(file=f,
         arr=hidden_dims)
 f.close()
 
 
 #hidden_dims = hidden_dims.flatten()
-logging.info("Retrieved hidden dims!")
+logging.info("Retrieved hidden dims! Program complete!!!")
 
-# performing umap red
-#umap_red = umap.UMAP()
-#umap_emb = umap_red.fit_transform(hidden_dims)
-#logging.info("UMAP fitted!")
-#
-#logging.info("Plotting UMAP and saving plot...")
-## plotting umap
-#fig = plt.figure()
-#plt.scatter(umap_emb[:, 0], umap_emb[:, 1])
-#plt.title("UMAP Projection")
-#fig.savefig("../plots/umap.pdf")
