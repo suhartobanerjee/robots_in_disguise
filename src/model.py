@@ -145,7 +145,7 @@ class CreateMask(nn.Module):
         super(CreateMask, self).__init__()
         self.prob = prob
         self.device = "cuda"
-        self.tokens_to_exclude = torch.tensor([1, 2, 3]).to(self.device)
+        self.tokens_to_exclude = torch.tensor([1, 2, 3] + [x for x in range(32_001, 32_025)]).to(self.device)
 
     def add_mask_token(self, input_data):
         # Create a binary mask where 1 indicates masking and 0 indicates not masking

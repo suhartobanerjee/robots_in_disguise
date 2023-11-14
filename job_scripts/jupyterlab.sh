@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #$ -N jupyterlab
-#$ -l h_rt=48:00:00
+#$ -l h_rt=10:00:00
 #$ -l m_mem_free=32G
 #$ -o /fast/AG_Sanders/suharto/robots_in_disguise/.jupyter_logs/jupyterlab_$JOB_ID
 #$ -e /fast/AG_Sanders/suharto/robots_in_disguise/.jupyter_logs/jupyterlab_$JOB_ID

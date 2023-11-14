@@ -1,9 +1,11 @@
 #!/bin/bash
 
+#$ -now no
+#$ -pe smp 4
 #$ -l gpu=8
-#$ -l h=maxg12
-#$ -l m_mem_free=128G
-#$ -l h_rt=72:00:00
+#$ -l h=maxg26
+#$ -l m_mem_free=20G
+#$ -l h_rt=10:00:00
 #$ -o /fast/AG_Sanders/suharto/robots_in_disguise/logs/log_$JOB_ID.txt
 #$ -e /fast/AG_Sanders/suharto/robots_in_disguise/logs/log_$JOB_ID.txt
 
@@ -21,6 +23,7 @@ conda activate pytorch
 printf "Conda env activated at : %s\n" $CONDA_DEFAULT_ENV
 
 export GPUS=$(echo $SGE_HGR_gpu | sed 's/gpu//g' | sed 's/ /,/g')
+export JOB_ID=$JOB_ID
 #printf "CUDA_VISIBLE_DEVICES=%s\n" $(echo $CUDA_VISIBLE_DEVICES)
 
 time python chr21_mock_train.py
