@@ -21,6 +21,11 @@ logging.basicConfig(level=logging.DEBUG, format = "%(asctime)s %(levelname)s: %(
 os.environ['CUDA_VISIBLE_DEVICES'] = os.environ['GPUS']
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
 logging.debug(os.environ['CUDA_VISIBLE_DEVICES'])
+logging.info(f"Number of CUDA devices : {torch.cuda.device_count()}")
+
+
+job_id = os.environ['JOB_ID']
+logging.info(job_id)
 
 # mp n_cores
 n_cores = mp.cpu_count()
@@ -45,6 +50,10 @@ def sample_nbp(seq: list, nbp: int) -> list:
 
 
 def read_chr_data(chr_id: str) -> str:
+    if chr_id == "23":
+        chr_id = "X"
+    if chr_id == "24":
+        chr_id = "Y"
     with gzip.open(f"../data/chr{chr_id}.txt.gz", 'rb') as target:
         data = str(target.read())
     logging.info(f"Chromosome file read: chr{chr_id}!")
@@ -57,7 +66,7 @@ def read_chr_data(chr_id: str) -> str:
     return conf_str
 
 
-chr_to_read = [str(x) for x in range(1, 23)]
+chr_to_read = [str(x) for x in range(1, 25)]
 #chr_to_read.append("X")
 #chr_to_read.append("Y")
 
@@ -152,7 +161,7 @@ def add_special_tokens(chr, chr_id):
 pre_proc_tokens = [add_special_tokens(chunked_tokens[i], chr_to_read[i]) for i in range(0, len(chunked_tokens))]
 
 # writing the labels to file
-with open("../proc/token_labels.txt", "w") as file:
+with open(f"../proc/{job_id}_token_labels.txt", "w") as file:
     file.write(str(labels))
 
 
@@ -170,6 +179,13 @@ for chr in pre_proc_tokens:
 # padding seq which have less than max_seq_len
 padded_tokens = [add_padding(tokens) for tokens in proc_tokens]
 #padded_tokens = chunked_tokens
+
+#saving the padded_tokens to file to later work on it
+f = gzip.GzipFile(f"../proc/{job_id}_input_tokens_matrix.npy.gz", "w")
+np.save(file=f,
+        arr=padded_tokens)
+f.close()
+
 
 # converting into tensor.
 tokens_tensor = torch.tensor(padded_tokens)
@@ -205,7 +221,7 @@ enc_output_cpu = enc_output.cpu()
 hidden_dims = enc_output_cpu.detach().numpy()
 
 # saving the encoder output to disk
-f = gzip.GzipFile("../proc/all_chr_random_subset_embed_dims.npy.gz", "w")
+f = gzip.GzipFile(f"../proc/{job_id}_all_chr_embed_dims.npy.gz", "w")
 np.save(file=f,
         arr=hidden_dims)
 f.close()
