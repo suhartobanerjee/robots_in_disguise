@@ -11,6 +11,8 @@ from transformers import AutoTokenizer
 import re
 import os
 import multiprocessing as mp
+import time
+import sklearn
 
 model_name = 'gena-lm-bert-base'
 tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
@@ -32,6 +34,7 @@ embed_dim.shape
 with open(f"../proc/{job_id}_token_labels.txt") as file:
     labels = file.read()
     print("labels read!")
+
 
 def proc_labels(labels):
     labels = labels.replace("[", "")
@@ -61,54 +64,108 @@ labels, labels_idx, old_labels = proc_labels(labels)
 
 f = gzip.GzipFile(f"../proc/{job_id}_input_tokens_matrix.npy.gz", "r")
 input_tokens = np.load(f)
+f.close()
 input_tokens.shape
 
 
 ## Token Extraction
 
 
+def extract_token(_embed_dim, token_pos):
+    token_stack = _embed_dim[:, token_pos:token_pos+1, :]
+    token_stack = np.squeeze(token_stack)
 
-def token_extractor(token_pos):
-
-    def extract_token(embed_dim: []):
-        token_stack = np.zeros((embed_dim.shape[0], embed_dim.shape[2]))
-        for x in range(embed_dim.shape[0]):
-            curr_stack = embed_dim[x:x+1,
-                                   token_pos:token_pos+1,
-                                   :].flatten()
-            token_stack = np.vstack((token_stack, curr_stack))
-
-        # removing the 0 rows
-        token_stack = token_stack[~np.all(token_stack == 0, axis=1)]
-
-        return token_stack
-
-    return extract_token
-
-
-cls_extractor = [token_extractor(x) for x in (0, 1)]
-cls_extractor
-
-
-def smap(f, embed_dim=embed_dim):
-    return f(embed_dim)
+    return token_stack
 
 
 # mp n_cores
 n_cores = mp.cpu_count()
 
-# parallelize
-with mp.Pool(processes=n_cores) as pool:
-    result_cls = pool.map_async(token_extractor(0), embed_dim)
-    result_chr = pool.map_async(token_extractor(1), embed_dim)
-
-
-cls_stack = result_cls.get()
-chr_stack = result_chr.get()
+# sequential
+# use a map function here maybe?
+tstart = time.time()
+cls_stack = extract_token(embed_dim, 0)
+print(time.time() - tstart)
 
 
 
-## decode sequences
+len(result_list)
+cls_stack = result_list[0]
+chr_stack = result_list[1]
+chr_stack.shape
+
+
+## Umap reduction
+
+umap_red = umap.UMAP()
+umap_embed_cls = umap_red.fit_transform(cls_stack)
+umap_embed_chr = umap_red.fit_transform(chr_stack)
+
+
+# making a df to use with seaborn
+def df_from_umap(umap, labels, labels_col_name):
+    umap_df = pl.from_numpy(umap, schema=["UMAP 1", "UMAP 2"])
+    umap_df = umap_df.with_columns(
+        pl.Series(labels_col_name, labels),
+        # pl.Series("idx", labels_idx).map_elements(
+        #     lambda x: int(x.split("_")[1])
+        # )
+    )
+
+    return umap_df
+
+
+umap_df_cls = df_from_umap(umap_embed_cls, labels, labels_idx)
+umap_df_chr = df_from_umap(umap_embed_chr, labels, labels_idx)
+umap_df_cls
+
+
+# clustering the UMAP with hdbscan
+
+hdbscan_red = sklearn.cluster.HDBSCAN(n_jobs=n_cores,
+                                      min_cluster_size=30,
+                                      min_samples=5
+                                      )
+
+cls_clusters_hdbscan = hdbscan_red.fit_predict(umap_embed_cls)
+len(set(cls_clusters_hdbscan))
+set(cls_clusters_hdbscan)
+len(cls_clusters_hdbscan)
+cls_clusters_hdbscan[0:5]
+hdbscan_red.fit(cls_stack)
+
+
+
+# making a df to use with seaborn
+hdbs_cls_df = df_from_umap(umap_embed_cls, cls_clusters_hdbscan, "hdbscan_clusters")
+hdbs_cls_df = hdbs_cls_df.filter(
+    pl.col("hdbscan_clusters") != -1
+    )
+
+
+# plotting
+def plot_umap(umap_df, color_col, plt_title, save_filename):
+    fig, ax = plt.subplots(1, figsize=(6, 6))
+
+    ax = sns.scatterplot(data=umap_df,
+                         x="UMAP 1",
+                         y="UMAP 2",
+                         s=2,
+                         hue=color_col)
+
+    plt.legend(markerscale=3)
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1.02))
+    plt.title(plt_title)
+    fig.savefig(fname=save_filename, bbox_inches='tight')
+
+
+plot_umap(umap_df=hdbs_cls_df,
+          color_col="hdbscan_clusters",
+          plt_title="CLS Token: HDBSCAN Clustering",
+          save_filename=f"../plots/{job_id}_{chr_names}_cls_hdbscan.pdf"
+          )
+
+# decode sequences
 
 def decode_sequences(tokens_list):
     sequence = list(map(tokenizer.decode, tokens_list[0:5]))
