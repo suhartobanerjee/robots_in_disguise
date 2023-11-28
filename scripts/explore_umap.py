@@ -6,17 +6,18 @@ import seaborn as sns
 import gzip
 import polars as pl
 import sklearn.cluster as cluster
-import hdbscan
-from transformers import AutoTokenizer
-import re
-import os
 import multiprocessing as mp
 import time
 import sklearn
+import colorcet as cc
+import importlib
+import explore_methods
+from explore_methods import *
+importlib.reload(explore_methods)
 
-model_name = 'gena-lm-bert-base'
-tokenizer = AutoTokenizer.from_pretrained(f'AIRI-Institute/{model_name}')
 print("All libraries imported!")
+tmp_plot = "../plots/tmp_plot.pdf"
+
 
 ## 1. Encoder outputs
 
@@ -35,28 +36,6 @@ with open(f"../proc/{job_id}_token_labels.txt") as file:
     labels = file.read()
     print("labels read!")
 
-
-def proc_labels(labels):
-    labels = labels.replace("[", "")
-    labels = labels.replace("]", "")
-    labels = labels.replace("\'", "")
-    labels = list(labels.split(","))
-
-    # removing whitespace before string
-    labels = [chr.strip() for chr in labels]
-    old_labels = labels
-
-    # renaming chrX and chrY
-    labels = [chr.replace("chr23", "chrX") for chr in labels]
-    labels = [chr.replace("chr24", "chrY") for chr in labels]
-
-    labels_idx = [None] * len(labels)
-    for idx, label in enumerate(labels):
-        labels_idx[idx] = labels[idx] + "_" + str(idx)
-
-    return (labels, labels_idx, old_labels)
-
-
 labels, labels_idx, old_labels = proc_labels(labels)
 
 
@@ -71,63 +50,119 @@ input_tokens.shape
 ## Token Extraction
 
 
-def extract_token(_embed_dim, token_pos):
-    token_stack = _embed_dim[:, token_pos:token_pos+1, :]
-    token_stack = np.squeeze(token_stack)
-
-    return token_stack
-
-
 # mp n_cores
 n_cores = mp.cpu_count()
+n_cores
 
 # sequential
 # use a map function here maybe?
-tstart = time.time()
-cls_stack = extract_token(embed_dim, 0)
-print(time.time() - tstart)
+result_list = [extract_token(embed_dim, x) for x in [0, 1]]
 
-
-
-len(result_list)
 cls_stack = result_list[0]
 chr_stack = result_list[1]
-chr_stack.shape
+cls_stack.shape
+
+
+## PCA check
+
+pca_red = sklearn.decomposition.PCA(n_components=10)
+
+# cls token
+cls_pca = pca_red.fit_transform(cls_stack)
+cls_pca.shape
+var_pca = [round(x, 4) for x in pca_red.explained_variance_ratio_]
+var_pca
+
+cls_pca_df = df_from_dim_red(cls_pca[:, 0:2], "pca", labels, "chr")
+cls_pca_df
+
+cls_pca_df = cls_pca_df.rename(
+        {
+            "pca 1": f"pca 1: {var_pca[0]}",
+            "pca 2": f"pca 2: {var_pca[1]}"
+        }
+        )
+cls_pca_df
+
+#plotting
+plot_dim_red(dim_red_df=cls_pca_df,
+             color_col="chr",
+             color_pal=palette,
+             plt_title="CLS Token: PCA",
+             save_filename=f"../plots/{job_id}_{chr_names}_cls_pca.pdf"
+             )
+
+
+# chr token 
+chr_pca = pca_red.fit_transform(chr_stack)
+chr_pca.shape
+var_pca = [round(x, 4) for x in pca_red.explained_variance_ratio_]
+var_pca
+
+chr_pca_df = df_from_dim_red(chr_pca[:, 0:2], "pca", labels, "chr")
+chr_pca_df
+
+chr_pca_df = chr_pca_df.rename(
+        {
+            "pca 1": f"pca 1: {var_pca[0]}",
+            "pca 2": f"pca 2: {var_pca[1]}"
+        }
+        )
+chr_pca_df
+
+#plotting
+plot_dim_red(dim_red_df=chr_pca_df,
+             color_col="chr",
+             color_pal=palette,
+             plt_title="chr Token: PCA",
+             save_filename=f"../plots/{job_id}_{chr_names}_chr_pca.pdf"
+             )
+
+
 
 
 ## Umap reduction
 
 umap_red = umap.UMAP()
-umap_embed_cls = umap_red.fit_transform(cls_stack)
-umap_embed_chr = umap_red.fit_transform(chr_stack)
+umap_cls = umap_red.fit_transform(cls_pca)
+umap_chr = umap_red.fit_transform(chr_pca)
 
 
 # making a df to use with seaborn
-def df_from_umap(umap, labels, labels_col_name):
-    umap_df = pl.from_numpy(umap, schema=["UMAP 1", "UMAP 2"])
-    umap_df = umap_df.with_columns(
-        pl.Series(labels_col_name, labels),
-        # pl.Series("idx", labels_idx).map_elements(
-        #     lambda x: int(x.split("_")[1])
-        # )
-    )
+umap_cls_df = df_from_dim_red(umap_cls, "umap", labels, "chr")
+umap_chr_df = df_from_dim_red(umap_chr, labels, labels_idx)
+umap_cls_df
 
-    return umap_df
+plot_dim_red(dim_red_df=umap_cls_df,
+             color_col="chr",
+             plt_title="CLS Token: UMAP",
+             save_filename=tmp_plot
+             )
+
+## agglomerative clustering
+
+ag_clustering = cluster.AgglomerativeClustering()
+ag_clusters = ag_clustering.fit_predict(cls_pca)
+len(set(ag_clusters))
+set(ag_clusters)
+
+# making a df to use with seaborn
+agclst_cls_df = df_from_dim_red(umap_cls, "umap", ag_clusters, "ag_clst")
+
+# plotting
+plot_dim_red(dim_red_df=agclst_cls_df,
+             color_col="ag_clst",
+             plt_title="CLS Token: AgglomerativeClustering",
+             save_filename=tmp_plot
+             )
 
 
-umap_df_cls = df_from_umap(umap_embed_cls, labels, labels_idx)
-umap_df_chr = df_from_umap(umap_embed_chr, labels, labels_idx)
-umap_df_cls
+## HDBSCAN clustering
 
-
-# clustering the UMAP with hdbscan
-
-hdbscan_red = sklearn.cluster.HDBSCAN(n_jobs=n_cores,
-                                      min_cluster_size=30,
-                                      min_samples=5
+hdbscan_red = sklearn.cluster.HDBSCAN(n_jobs=n_cores
                                       )
 
-cls_clusters_hdbscan = hdbscan_red.fit_predict(umap_embed_cls)
+cls_clusters_hdbscan = hdbscan_red.fit_predict(cls_pca)
 len(set(cls_clusters_hdbscan))
 set(cls_clusters_hdbscan)
 len(cls_clusters_hdbscan)
@@ -137,66 +172,67 @@ hdbscan_red.fit(cls_stack)
 
 
 # making a df to use with seaborn
-hdbs_cls_df = df_from_umap(umap_embed_cls, cls_clusters_hdbscan, "hdbscan_clusters")
+hdbs_cls_df = df_from_dim_red(umap_cls, "hdbscan", cls_clusters_hdbscan, "hdbscan_clusters")
+hdbs_cls_df
 hdbs_cls_df = hdbs_cls_df.filter(
     pl.col("hdbscan_clusters") != -1
     )
+n_clusters = len(set(hdbs_cls_df["hdbscan_clusters"]))
+hdbs_cls_df
+#hdbs_cls_df.filter(
+#        pl.col("hdbscan_clusters") == 17
+#        )
 
 
 # plotting
-def plot_umap(umap_df, color_col, plt_title, save_filename):
-    fig, ax = plt.subplots(1, figsize=(6, 6))
-
-    ax = sns.scatterplot(data=umap_df,
-                         x="UMAP 1",
-                         y="UMAP 2",
-                         s=2,
-                         hue=color_col)
-
-    plt.legend(markerscale=3)
-    sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1.02))
-    plt.title(plt_title)
-    fig.savefig(fname=save_filename, bbox_inches='tight')
+palette = sns.color_palette(cc.glasbey_light, n_colors=n_clusters)
+#col_pal = sns.color_palette("Paired" , 24)
+plot_dim_red(dim_red_df=hdbs_cls_df,
+             color_col="hdbscan_clusters",
+             color_pal=palette,
+             plt_title="CLS Token: HDBSCAN Clustering",
+             save_filename=tmp_plot
+             #save_filename=f"../plots/{job_id}_{chr_names}_cls_hdbscan.pdf"
+             )
 
 
-plot_umap(umap_df=hdbs_cls_df,
-          color_col="hdbscan_clusters",
-          plt_title="CLS Token: HDBSCAN Clustering",
-          save_filename=f"../plots/{job_id}_{chr_names}_cls_hdbscan.pdf"
-          )
+## Kmeans
+kmeans = cluster.KMeans(n_clusters=4)
+kmeans.fit(cls_pca)
+
+len(set(kmeans.labels_))
+n_clusters = len(set(kmeans.labels_))
+
+kmeans_cls_df = df_from_dim_red(umap_cls, "kmeans", kmeans.labels_, "kmeans_clusters")
+kmeans_cls_df
+
+
+palette = sns.color_palette(cc.glasbey_light, n_colors=n_clusters)
+plot_dim_red(dim_red_df=kmeans_cls_df,
+             color_col="kmeans_clusters",
+             color_pal=palette,
+             plt_title="CLS Token: Kmeans Clustering",
+             #save_filename=tmp_plot
+             save_filename=f"../plots/{job_id}_{chr_names}_cls_kmeans.pdf"
+             )
 
 # decode sequences
 
-def decode_sequences(tokens_list):
-    sequence = list(map(tokenizer.decode, tokens_list[0:5]))
-    sequence = [re.sub(r"\[CLS\]|\[SEP\]", "", x) for x in sequence]
-    sequence = [re.sub(r"$", r"\n\n", x) for x in sequence]
+kmeans_cls_df = kmeans_cls_df.with_columns(
+        pl.Series("idx", labels_idx).map_elements(
+             lambda x: int(x.split("_")[1])
+        )
+        )
+kmeans_cls_df
+len(input_tokens[0])
+kmeans_cls_df.write_csv(file="./kmeans_cls_df.tsv", separator="\t")
 
-    return sequence
-
-
-sequence = decode_sequences(input_tokens[0:5])
-print(len(sequence))
-sequence[0:5]
-
-
-def clean_seq_fasta(filename):
-    if os.path.exists(filename):
-        os.remove(filename)
+# adding a unique fasta_header
+kmeans_cls_df = kmeans_cls_df.with_columns(
+        pl.Series("fasta_header", labels_idx)
+        )
 
 
-def write_seq_fasta(seq, label, x, filename="./test.fa"):
-    if x == 0:
-        clean_seq_fasta(filename)
-
-    with open(filename, "a") as file:
-        file.write(f"> {label}\n")
-        file.write(seq)
-
-
-[write_seq_fasta(sequence[x], labels_idx[x], x) for x in range(len(sequence))]
-
-
-
-
+# writing each cluster sequences to fasta file
+[get_clusters(kmeans_cls_df, input_tokens, x) for x in set(kmeans_cls_df['kmeans_clusters'])]
 
