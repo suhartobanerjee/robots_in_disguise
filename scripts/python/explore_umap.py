@@ -236,3 +236,19 @@ kmeans_cls_df = kmeans_cls_df.with_columns(
 # writing each cluster sequences to fasta file
 [get_clusters(kmeans_cls_df, input_tokens, x) for x in set(kmeans_cls_df['kmeans_clusters'])]
 
+
+# working with the kmeans clusters to get some QC
+kmeans_cls_df = pl.read_csv("./kmeans_cls_df.tsv", separator="\t")
+kmeans_cls_df
+
+cluster_1 = kmeans_cls_df.filter(
+        pl.col("kmeans_clusters") == 0
+        )
+cluster_1_idx = cluster_1['idx']
+
+cluster_1_tokens = input_tokens[cluster_1_idx]
+cluster_1_tokens[0]
+
+
+
+
