@@ -68,3 +68,32 @@ extract_tokens <- function(embed_dim) {
         return(token_stack)
     }
 }
+
+
+select_cluster <- function(so) {
+
+    function(idx) {
+
+        clst <- subset(so, ident = idx)
+        clst_idx <- colnames(clst$RNA@counts)
+        clst_idx <- str_replace(clst_idx, "V", "")
+        clst_idx <- map_vec(clst_idx, as.integer)
+
+
+        return(clst_idx)
+    }
+}
+
+
+pool_cluster_tokens <- function(input_tokens) {
+
+    function(clst_idx) {
+
+        clst_tokens <- input_tokens[clst_idx,]
+        pooled_tokens <- as.vector(clst_tokens) |>
+            discard(function(x) x < 3)
+
+
+        return(pooled_tokens)
+    }
+}
