@@ -85,15 +85,64 @@ select_cluster <- function(so) {
 }
 
 
+get_cluster_tensors <- function(input_tokens) {
+
+    function(clst_idx) {
+
+        cluster_tensors <- input_tokens[clst_idx,]
+
+
+        return(cluster_tensors)
+    }
+}
+
+
 pool_cluster_tokens <- function(input_tokens) {
 
     function(clst_idx) {
 
-        clst_tokens <- input_tokens[clst_idx,]
-        pooled_tokens <- as.vector(clst_tokens) |>
+        get_tensors <- get_cluster_tensors(input_tokens)
+        cluster_tensors <- get_tensors(clst_idx)
+        pooled_tokens <- as.vector(cluster_tensors) |>
             discard(function(x) x < 3)
 
 
         return(pooled_tokens)
     }
 }
+
+
+check_token_tensor <- function(cluster, token) {
+
+    return(cluster %in% token)
+}
+
+
+get_top_tokens_frequency <- function(top_tokens) {
+
+    function(cluster) {
+        filtered_cluster <- map(top_tokens, function(token) cluster %in% token)
+
+        # reshape the flattened vec to matrix
+        filtered_cluster <- map(filtered_cluster,
+                                function(x) matrix(x,
+                                                   nrow = dim(cluster)[1],
+                                                   ncol = dim(cluster)[2]
+                                                   )
+        )
+        filtered_cluster_dt <- map(filtered_cluster, as.data.table)
+
+        occurence_dt <- imap(filtered_cluster_dt,
+                             function(dt, idx) {
+                                 occurence_dt <- data.table(
+                                    token = top_tokens[idx],
+                                    freq = rowSums(dt)
+                                 )
+                             }
+        )
+        occurence_dt <- reduce(occurence_dt, rbind)
+
+
+        return(occurence_dt)
+    }
+} 

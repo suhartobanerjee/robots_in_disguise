@@ -5,7 +5,7 @@ library(purrr)
 library(Seurat)
 library(ggplot2)
 library(RColorBrewer)
-library(circlize)
+library(clustree)
 
 
 source("./methods.R")
@@ -42,8 +42,9 @@ result_list <- map(c(1:2), token_extractor)
 cls_stack <- result_list[[1]]
 chr_stack <- result_list[[2]]
 dim(cls_stack)
-cls_stack[1:2, 1:5]
-class(cls_stack)
+#cls_stack[1:2, 1:5]
+#class(cls_stack)
+remove(result_list)
 
 
 # creating counts matrix
@@ -62,12 +63,12 @@ setcolorder(
 )
 dims <- cls_stack_dt[, idx]
 dims
-cls_stack_dt[, 1:5]
-table(is.na(cls_stack_dt))
+#cls_stack_dt[, 1:5]
+#table(is.na(cls_stack_dt))
 
 
 cls_stack_df <- as.data.frame(cls_stack_dt)
-cls_stack_df[1:5,1:5]
+#cls_stack_df[1:5,1:5]
 rownames(cls_stack_df) <- cls_stack_df$idx
 cls_stack_df$idx <- NULL
 cls_stack_df[1:5,1:5]
@@ -137,113 +138,134 @@ saveRDS(cls_so, file = str_glue("../proc/{job_id}_till_umap.rds"))
 # load RDS
 cls_so <- readRDS(str_glue("../proc/{job_id}_till_umap.rds"))
 
-pick_cluster <- select_cluster(cls_so)
-#clst5_idx <- pick_cluster(5)
-#clst5_idx[1:5]
 
-clsts <- c(0, 13, 14, 15)
-clst_list <- map(clsts, pick_cluster)
+clusters <- c(5, 24, 0, 13, 14, 15)
+
+pick_cluster <- select_cluster(cls_so)
+
+clst_list <- map(clusters, pick_cluster)
 length(clst_list)
 
-
 tokens_pooler <- pool_cluster_tokens(input_tokens)
-#pooled_tokens <- tokens_pooler(clst5_idx)
 
 pooled_tokens_list <- map(clst_list, tokens_pooler)
 length(pooled_tokens_list)
-pooled_tokens_list[[1]][1:15]
+# pooled_tokens_list[[1]][1:15]
 
 # pool all tokens from cluster
-length(pooled_tokens) + 2986 * 2 == 1528832
+# length(pooled_tokens) + 2986 * 2 == 1528832
 
 # pooled_freq <- table(pooled_tokens)
-pooled_freq[1:6]
+# pooled_freq[1:6]
 
 pooled_freq_list <- map(pooled_tokens_list, table)
-pooled_freq_list[[1]][1]
-
 
 freq_dt_list <- map(pooled_freq_list, as.data.table)
-freq_dt_list
 
-freq_dt_list <- imap(freq_dt_list, function(dt, idx) dt[, cluster := idx])
+freq_dt_list <- imap(freq_dt_list, function(dt, idx) dt[, cluster := clusters[idx]])
+
 freq_dt <- reduce(freq_dt_list, rbind)
+
+
+# finding the sum of the tokens in a cluster
+freq_dt[, sum_tokens := sum(.SD$N), by = cluster]
+setnames(
+    freq_dt,
+    "V1",
+    "token"
+)
 freq_dt
 
-
-freq_dt[cluster == 24]
-cutoff_dt <- freq_dt[, .SD[order(-N)][1:10], by = cluster]
+# take the top n of each cluster
+top_n <- 10
+cutoff_dt <- freq_dt[, .SD[order(-N)][1:top_n], by = cluster]
+cutoff_dt[, prop_N := N / sum_tokens]
+cutoff_dt[, prop_labels := round(prop_N, 4)]
 cutoff_dt
 
-col_pal <- brewer.pal(10, "Purples")
-col_pal
 
 freq_plot <- ggplot(
     data = cutoff_dt,
-    aes(x = 1,
-        y = 1,
-        size = N,
-        label = V1,
-        fill = N
+    aes(x = token,
+        y = factor(cluster),
+        size = prop_N,
+        label = prop_labels,
+        color = prop_N
     )
 ) +
-     geom_point(alpha = 0) +
-    geom_jitter(shape = 21,
-                position = position_jitter(seed = 1)) +
-    geom_text(position = position_jitter(seed = 1),
-              aes(vjust = -1),
-              size = 4
-    )+
-    scale_fill_gradient(low = "lightgreen", high = "darkgreen") +
-    facet_grid(~ cluster)
-
-ggsave(tmp_plot)
-ggsave(str_glue("../plots/{job_id}_0_13-15_token_usage.pdf"))
-ggsave(str_glue("../plots/{job_id}_5_token_usage.pdf"))
+    geom_point() +
+    geom_text(vjust = -2, size = 3, color = "black") +
+    scale_color_gradient(low = "lightblue", high = "darkblue") +
+    scale_y_discrete(name = "Clusters",
+                     limits = factor(clusters)) +
+    xlab("Tokens") +
+    ggtitle(str_glue("Token Usage among clusters: Top {top_n} tokens")) +
+    theme_bw()
 
 
-# START HERE
-### Plot sectors (outer part)
-par(mar=rep(0,4))
-circos.clear()
- 
-### Basic circos graphic parameters
-circos.par(cell.padding=c(0,0,0,0), track.margin=c(0,0.15), start.degree = 90, gap.degree =4)
- 
-### Sector details
-circos.initialize(factors = df1$country, xlim = cbind(df1$xmin, df1$xmax))
- 
-### Plot sectors
-circos.trackPlotRegion(ylim = c(0, 1), factors = df1$country, track.height=0.1,
-                      #panel.fun for each sector
-                      panel.fun = function(x, y) {
-                      #select details of current sector
-                      name = get.cell.meta.data("sector.index")
-                      i = get.cell.meta.data("sector.numeric.index")
-                      xlim = get.cell.meta.data("xlim")
-                      ylim = get.cell.meta.data("ylim")
- 
-                      #text direction (dd) and adjusmtents (aa)
-                      theta = circlize(mean(xlim), 1.3)[1, 1] %% 360
-                      dd <- ifelse(theta < 90 || theta > 270, "clockwise", "reverse.clockwise")
-                      aa = c(1, 0.5)
-                      if(theta < 90 || theta > 270)  aa = c(0, 0.5)
- 
-                      #plot country labels
-                      circos.text(x=mean(xlim), y=1.7, labels=name, facing = dd, cex=0.6,  adj = aa)
- 
-                      #plot main sector
-                      circos.rect(xleft=xlim[1], ybottom=ylim[1], xright=xlim[2], ytop=ylim[2], 
-                                  col = df1$rcol[i], border=df1$rcol[i])
- 
-                      #blank in part of main sector
-                      circos.rect(xleft=xlim[1], ybottom=ylim[1], xright=xlim[2]-rowSums(m)[i], ytop=ylim[1]+0.3, 
-                                  col = "white", border = "white")
- 
-                      #white line all the way around
-                      circos.rect(xleft=xlim[1], ybottom=0.3, xright=xlim[2], ytop=0.32, col = "white", border = "white")
- 
-                      #plot axis
-                      circos.axis(labels.cex=0.6, direction = "outside", major.at=seq(from=0,to=floor(df1$xmax)[i],by=5), 
-                                  minor.ticks=1, labels.away.percentage = 0.15)
-                    })
+# ggsave(tmp_plot, width = 14, height = 7)
+
+ggsave(
+    filename = str_glue("../plots/{job_id}_5_24_0_13-15_raw_token_usage_top{top_n}.pdf"),
+    plot = freq_plot,
+    width = 14,
+    height = 7
+)
+ggsave(
+    filename = str_glue("../plots/{job_id}_5_24_0_13-15_prop_token_usage_top{top_n}.pdf"),
+    plot = freq_plot,
+    width = 14,
+    height = 7
+)
+
+
+
+# finding the dist of these top_n tokens in tensors
+top_tokens <- as.integer(unique(cutoff_dt$token))
+top_tokens
+
+################################################################################
+get_tensors <- get_cluster_tensors(input_tokens)
+cluster_tensors <- map(clst_list, get_tensors)
+str(cluster_tensors)
+
+get_tokens_freq <- get_top_tokens_frequency(top_tokens)
+filtered_cluster <- map(cluster_tensors, get_tokens_freq)
+str(filtered_cluster)
+
+
+filtered_cluster <- imap(filtered_cluster, function(dt, idx) dt[, cluster := clusters[idx]])
+str(filtered_cluster)
+
+
+occurence_dt <- reduce(filtered_cluster, rbind)
+occurence_dt
+
+
+tensor_freq_plot <- ggplot(
+    data = occurence_dt,
+    aes(x = factor(token),
+        y = freq,
+        color = factor(cluster)
+    )
+) +
+    geom_violin() +
+    stat_summary(fun=mean,
+                    colour="darkred",
+                    geom="crossbar",
+                    width = 0.5
+                    ) +
+    xlab("tokens") +
+    facet_grid(~ factor(cluster))
+
+ggsave(tmp_plot,
+       width = 20,
+       height = 9
+)
+
+ggsave(filename = str_glue("../plots/{job_id}_5_24_0_13-15_token_top{top_n}_dist_tensors.pdf"),
+       width = 20,
+       height = 9
+)
+
+
