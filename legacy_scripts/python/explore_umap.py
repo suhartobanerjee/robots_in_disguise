@@ -251,4 +251,12 @@ cluster_1_tokens[0]
 
 
 
+# ## writing the dictionary to file
+vocab_dict = {token: tokenizer.decode(token) for token in range(0, 32_000)}
+len(vocab_dict)
+vocab_dict[31999]
+vocab_dict[319]
 
+import json
+with open("../../proc/bpe.json", 'w') as f:
+    json.dump(vocab_dict, f)

@@ -6,6 +6,7 @@ library(Seurat)
 library(ggplot2)
 library(RColorBrewer)
 library(clustree)
+library(rjson)
 
 
 source("./methods.R")
@@ -139,8 +140,8 @@ saveRDS(cls_so, file = str_glue("../proc/{job_id}_till_umap.rds"))
 cls_so <- readRDS(str_glue("../proc/{job_id}_till_umap.rds"))
 
 
+################################################################################
 clusters <- c(5, 24, 0, 13, 14, 15)
-
 pick_cluster <- select_cluster(cls_so)
 
 clst_list <- map(clusters, pick_cluster)
@@ -175,7 +176,9 @@ setnames(
     "token"
 )
 freq_dt
+################################################################################
 
+################################################################################
 # take the top n of each cluster
 top_n <- 10
 cutoff_dt <- freq_dt[, .SD[order(-N)][1:top_n], by = cluster]
@@ -219,12 +222,8 @@ ggsave(
 )
 
 
-
-# finding the dist of these top_n tokens in tensors
-top_tokens <- as.integer(unique(cutoff_dt$token))
-top_tokens
-
 ################################################################################
+
 get_tensors <- get_cluster_tensors(input_tokens)
 cluster_tensors <- map(clst_list, get_tensors)
 str(cluster_tensors)
@@ -269,3 +268,148 @@ ggsave(filename = str_glue("../plots/{job_id}_5_24_0_13-15_token_top{top_n}_dist
 )
 
 
+################################################################################
+
+# take the bottom n of each cluster
+bottom_n <- 10
+cutoff_dt <- freq_dt[, .SD[order(N)][1:bottom_n], by = cluster]
+cutoff_dt
+
+
+freq_plot <- ggplot(
+    data = cutoff_dt,
+    aes(x = token,
+        y = factor(cluster),
+        size = N,
+        label = N,
+        color = N
+    )
+) +
+    geom_point() +
+    geom_text(vjust = -2, size = 3, color = "black") +
+    scale_color_gradient(low = "lightblue", high = "darkblue") +
+    scale_y_discrete(name = "Clusters",
+                     limits = factor(clusters)) +
+    xlab("Tokens") +
+    ggtitle(str_glue("Token Usage among clusters: Bottom {bottom_n} tokens")) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+# ggsave(tmp_plot, width = 14, height = 7)
+
+ggsave(
+    filename = str_glue("../plots/{job_id}_5_24_0_13-15_raw_bottom{bottom_n}_tokens_usage.pdf"),
+    plot = freq_plot,
+    width = 14,
+    height = 7
+)
+
+
+################################################################################
+# reading the dict and making a dt out of it
+raw_dict <- fromJSON(file = "../proc/bpe.json")
+str(raw_dict)
+head(raw_vocab) 
+raw_vocab[31775]
+
+
+vocab_dt <- data.table(
+    token = names(raw_dict),
+    sequence = raw_dict
+)
+vocab_dt[, sequence := as.character(sequence)]
+vocab_dt[1:10]
+
+
+fwrite(file = "../proc/bpe_vocab.tsv",
+       sep = "\t",
+       vocab_dt
+)
+################################################################################
+vocab_dt <- fread("../proc/bpe_vocab.tsv")
+vocab_dt[1:10]
+setkey(vocab_dt, token)
+vocab_dt[token == 31775]
+
+
+vocab_dt[token %in% cutoff_dt$token]
+
+
+################################################################################
+# getting the marker tokens_pooler
+# every iter, it reorders the list to put the current idx 
+# vec to the top. Then do setdiff in a reduce fashion
+marker_tokens <- imap(pooled_tokens_list, function(cluster, idx) {
+    union_tokens <- c(pooled_tokens_list[idx], pooled_tokens_list[-idx])
+    reduce(union_tokens, setdiff)
+    })
+# sanity check
+str(marker_tokens)
+freq_dt[token == 30487]
+map(marker_tokens, function(x) 30487 %in% x)
+
+marker_tokens_dtlist <- map(marker_tokens, as.data.table)
+marker_tokens_dtlist <- imap(marker_tokens_dtlist, function(dt, idx) dt[, cluster := clusters[idx]])
+marker_tokens_dt <- reduce(marker_tokens_dtlist, rbind)
+setnames(
+    marker_tokens_dt,
+    "V1",
+    "token"
+)
+marker_tokens_dt
+fwrite(file = "../proc/marker_tokens_5_24_0_13-15.tsv",
+       marker_tokens_dt,
+       sep ="\t"
+)
+
+# joining
+marker_tokens_dt[, token := as.integer(token)]
+freq_dt[, token := as.integer(token)]
+setkey(freq_dt, token)
+setkey(marker_tokens_dt, token)
+
+marker_tokens_freq_dt <- freq_dt[marker_tokens_dt, on = .(token, cluster)]
+marker_tokens_freq_dt
+
+# 365 markers for cluster 0
+marker_tokens_freq_dt[cluster == 0]
+
+
+freq_plot <- ggplot(
+    data = marker_tokens_freq_dt[cluster != 0],
+    aes(x = token,
+        y = factor(cluster),
+        size = N,
+        label = N,
+        color = N
+    )
+) +
+    geom_point() +
+    geom_text(vjust = -2, size = 3, color = "black") +
+    scale_color_gradient(low = "lightblue", high = "darkblue") +
+    scale_y_discrete(name = "Clusters",
+                     limits = factor(clusters[-3])) +
+    xlab("Tokens") +
+    ggtitle(str_glue("Marker Tokens")) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+# ggsave(tmp_plot, width = 14, height = 7)
+
+ggsave(
+    filename = str_glue("../plots/{job_id}_5_24_0_13-15_marker_tokens.pdf"),
+    plot = freq_plot,
+    width = 20,
+    height = 10
+)
+
+
+input_tokens 
+vocab_dt[token == 24101]
+marker_tokens_freq_dt <- vocab_dt[marker_tokens_freq_dt, on = .(token)]
+fwrite(file = "../proc/marker_tokens_5_24_0_13-15.tsv",
+       sep = "\t",
+       marker_tokens_freq_dt
+)
