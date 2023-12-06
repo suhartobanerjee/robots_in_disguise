@@ -146,3 +146,64 @@ get_top_tokens_frequency <- function(top_tokens) {
         return(occurence_dt)
     }
 } 
+
+
+find_tensors_with_tokens <- function(marker_tokens_dt, clusters) {
+
+    function(mat, idx) {
+        return(
+            which(
+                apply(cluster_tensors[[idx]],
+                      MARGIN = 1,
+                      FUN = function(x) sum(marker_tokens_dt[cluster == clusters[idx],
+                                                             token] %in% x)
+                      ) > 0
+            )
+        )
+    }
+}
+
+
+decode_tensors <- function(input_tokens, vocab_dt) {
+
+    function(tensor) {
+        # removing special tokens: cls, sep and chr tokens
+        proc_tensor <- discard(tensor, function(x) x < 3) |>
+            discard(function(x) x >32000)
+
+        # decoding each token using map
+        # then pasting all of them together using reduce
+        sequence <- reduce(
+            map(proc_tensor,
+                function(curr_token) vocab_dt[token == curr_token, sequence]
+            ),
+            paste0
+        )
+
+
+        return(sequence)
+    }
+}
+
+
+write_fasta <- function(cluster, cluster_idx) {
+
+    imap(cluster,
+        function(tensor, idx) {
+            # write the header
+            write(
+                file = str_glue("../proc/seurat_clusters/cluster_{cluster_idx}.fasta"),
+                x = str_glue(">{idx}"),
+                sep = "\n",
+                append = TRUE
+            )
+            # write the tensor
+            write(
+                file = str_glue("../proc/seurat_clusters/cluster_{cluster_idx}.fasta"),
+                x = tensor,
+                sep = "\n",
+                append = TRUE
+            )
+        }
+    )
+}
