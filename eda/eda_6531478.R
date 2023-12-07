@@ -392,19 +392,21 @@ str(cluster_tensors)
 n_threads <- as.integer(system("nproc", intern = T))
 n_threads
 plan(multicore, workers = n_threads - 1)
+plan()
 
 
 decoder <- decode_tensors(input_tokens, vocab_dt)
 cluster_seq <- future_map(cluster_tensors,
     function(cluster) apply(cluster, 1, decoder)
 )
+str(cluster_seq)
 
 saveRDS(cluster_seq,
         file = "../proc/cluster_seq.rds"
 )
 
 #  to do
-future_imap(cluster_tensors,
+future_imap(cluster_seq,
            function(cluster, idx) write_fasta(cluster, idx)
 )
 
