@@ -8,6 +8,7 @@ library(RColorBrewer)
 library(clustree)
 library(rjson)
 library(furrr)
+library(hash)
 
 
 source("./methods.R")
@@ -60,6 +61,7 @@ remove(result_list)
 # creating counts matrix
 # transposing the mat so the shape is
 # shape = (dims, n_samples)
+# cls stack here
 cls_stack_counts <- aperm(cls_stack, c(2,1))
 
 cls_stack_dt <- as.data.table(cls_stack_counts)
@@ -83,6 +85,32 @@ rownames(cls_stack_df) <- cls_stack_df$idx
 cls_stack_df$idx <- NULL
 cls_stack_df[1:5,1:5]
 
+
+########################################
+# chr stack here
+chr_stack_counts <- aperm(chr_stack, c(2,1))
+
+chr_stack_dt <- as.data.table(chr_stack_counts)
+chr_stack_dt[, idx := as.character(
+                        str_glue("dim-{c(1:nrow(chr_stack_dt))}")
+                        )
+]
+setcolorder(
+    chr_stack_dt,
+    "idx"
+)
+dims <- chr_stack_dt[, idx]
+dims
+#chr_stack_dt[, 1:5]
+#table(is.na(chr_stack_dt))
+
+
+chr_stack_df <- as.data.frame(chr_stack_dt)
+#chr_stack_df[1:5,1:5]
+rownames(chr_stack_df) <- chr_stack_df$idx
+chr_stack_df$idx <- NULL
+chr_stack_df[1:5,1:5]
+
 ################################################################################
 
 ################################################################################
@@ -97,7 +125,7 @@ cls_so <- readRDS(str_glue("../proc/{job_id}_till_umap.rds"))
 # cluster analysis
 # pooling cluster tokens
 # and calc their freq
-clusters <- c(5, 24, 0, 13, 14, 15)
+clusters <- c(5, 2, 0, 14, 15, 16, 17)
 
 pick_cluster <- select_cluster(cls_so)
 clst_list <- map(clusters, pick_cluster)
@@ -132,11 +160,39 @@ setkey(freq_dt, token)
 freq_dt
 ################################################################################
 
+
+################################################################################
+# plotting freq as line plot
+density_dt <- melt.data.table(freq_dt,
+                id.vars = "cluster",
+                measure.vars = "token"
+)
+
+freq_density_plot <- ggplot(
+    data = density_dt,
+    aes(x = value,
+        #         y = prop_N,
+        group = factor(cluster),
+        fill = factor(cluster)
+    )
+) +
+         #          geom_line()
+         #     stat_smooth(method = "lm", formula = y ~ poly(x, 5))
+         geom_density(adjust = 1.5, alpha = 0.4)
+#     geom_col()
+ggsave(filename = str_glue("../plots/{job_id}_freq_density.pdf"),
+       plot = freq_density_plot
+)
+
+
 ################################################################################
 # take the top n of each cluster
 # and do stats on it
-top_n <- 10
+top_n <- 50
 cutoff_dt <- freq_dt[, .SD[order(-N)][1:top_n], by = cluster]
+cutoff_dt[, cluster_rank := rank(prop_N), by = cluster]
+cutoff_dt[, token := as.integer(token)]
+setkey(cutoff_dt, token)
 cutoff_dt
 
 
@@ -146,17 +202,18 @@ freq_plot <- ggplot(
         y = factor(cluster),
         size = prop_N,
         label = prop_labels,
-        color = prop_N
+        color = cluster_rank
     )
 ) +
     geom_point() +
-    geom_text(vjust = -2, size = 3, color = "black") +
+    #     geom_text(vjust = -2, size = 3, color = "black") +
     scale_color_gradient(low = "lightblue", high = "darkblue") +
     scale_y_discrete(name = "Clusters",
                      limits = factor(clusters)) +
     xlab("Tokens") +
     ggtitle(str_glue("Token Usage among clusters: Top {top_n} tokens")) +
-    theme_bw()
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ggsave(
     filename = str_glue("../plots/{job_id}_5_24_0_13-15_raw_token_usage_top{top_n}.pdf"),
@@ -167,9 +224,18 @@ ggsave(
 ggsave(
     filename = str_glue("../plots/{job_id}_5_24_0_13-15_prop_token_usage_top{top_n}.pdf"),
     plot = freq_plot,
-    width = 14,
-    height = 7
+    width = 20,
+    height = 10
 )
+
+
+# getting the sequence of the top_n tokens
+cutoff_dt <- vocab_dt[cutoff_dt]
+fwrite(x = cutoff_dt,
+       file = str_glue("../proc/{job_id}_7_clusters_{top_n}_tokens_sequence.tsv"),
+       sep = "\t"
+)
+
 
 ################################################################################
 # checking the dist of top tokens in the indiv
@@ -394,8 +460,13 @@ n_threads
 plan(multicore, workers = n_threads - 1)
 plan()
 
+vocab_hashtable <- hash(keys = vocab_dt$token,
+                        values = vocab_dt$sequence
+)
+vocab_hashtable[[as.character(6)]]
 
-decoder <- decode_tensors(input_tokens, vocab_dt)
+
+decoder <- decode_tensors(input_tokens, vocab_hashtable)
 cluster_seq <- future_map(cluster_tensors,
     function(cluster) apply(cluster, 1, decoder)
 )
@@ -405,7 +476,6 @@ saveRDS(cluster_seq,
         file = "../proc/cluster_seq.rds"
 )
 
-#  to do
 future_imap(cluster_seq,
            function(cluster, idx) write_fasta(cluster, idx)
 )

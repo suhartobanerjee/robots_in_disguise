@@ -164,7 +164,7 @@ find_tensors_with_tokens <- function(marker_tokens_dt, clusters) {
 }
 
 
-decode_tensors <- function(input_tokens, vocab_dt) {
+decode_tensors <- function(input_tokens, vocab_hashtable) {
 
     function(tensor) {
         # removing special tokens: cls, sep and chr tokens
@@ -174,8 +174,8 @@ decode_tensors <- function(input_tokens, vocab_dt) {
         # decoding each token using map
         # then pasting all of them together using reduce
         sequence <- reduce(
-            map(proc_tensor,
-                function(curr_token) vocab_dt[token == curr_token, sequence]
+            future_map(proc_tensor,
+                function(curr_token) vocab_hashtable[[as.character(curr_token)]]
             ),
             paste0
         )
