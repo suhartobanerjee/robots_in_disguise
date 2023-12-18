@@ -50,8 +50,8 @@ result_list <- map(c(1:2), token_extractor)
 cls_stack <- result_list[[1]]
 chr_stack <- result_list[[2]]
 dim(cls_stack)
-#cls_stack[1:2, 1:5]
-#class(cls_stack)
+# cls_stack[1:2, 1:5]
+# class(cls_stack)
 remove(result_list)
 
 ################################################################################
@@ -62,54 +62,52 @@ remove(result_list)
 # transposing the mat so the shape is
 # shape = (dims, n_samples)
 # cls stack here
-cls_stack_counts <- aperm(cls_stack, c(2,1))
+cls_stack_counts <- aperm(cls_stack, c(2, 1))
 
 cls_stack_dt <- as.data.table(cls_stack_counts)
 cls_stack_dt[, idx := as.character(
-                        str_glue("dim-{c(1:nrow(cls_stack_dt))}")
-                        )
-]
+    str_glue("dim-{c(1:nrow(cls_stack_dt))}")
+)]
 setcolorder(
     cls_stack_dt,
     "idx"
 )
 dims <- cls_stack_dt[, idx]
 dims
-#cls_stack_dt[, 1:5]
-#table(is.na(cls_stack_dt))
+# cls_stack_dt[, 1:5]
+# table(is.na(cls_stack_dt))
 
 
 cls_stack_df <- as.data.frame(cls_stack_dt)
-#cls_stack_df[1:5,1:5]
+# cls_stack_df[1:5,1:5]
 rownames(cls_stack_df) <- cls_stack_df$idx
 cls_stack_df$idx <- NULL
-cls_stack_df[1:5,1:5]
+cls_stack_df[1:5, 1:5]
 
 
 ########################################
 # chr stack here
-chr_stack_counts <- aperm(chr_stack, c(2,1))
+chr_stack_counts <- aperm(chr_stack, c(2, 1))
 
 chr_stack_dt <- as.data.table(chr_stack_counts)
 chr_stack_dt[, idx := as.character(
-                        str_glue("dim-{c(1:nrow(chr_stack_dt))}")
-                        )
-]
+    str_glue("dim-{c(1:nrow(chr_stack_dt))}")
+)]
 setcolorder(
     chr_stack_dt,
     "idx"
 )
 dims <- chr_stack_dt[, idx]
 dims
-#chr_stack_dt[, 1:5]
-#table(is.na(chr_stack_dt))
+# chr_stack_dt[, 1:5]
+# table(is.na(chr_stack_dt))
 
 
 chr_stack_df <- as.data.frame(chr_stack_dt)
-#chr_stack_df[1:5,1:5]
+# chr_stack_df[1:5,1:5]
 rownames(chr_stack_df) <- chr_stack_df$idx
 chr_stack_df$idx <- NULL
-chr_stack_df[1:5,1:5]
+chr_stack_df[1:5, 1:5]
 
 ################################################################################
 
@@ -164,31 +162,30 @@ freq_dt
 ################################################################################
 # plotting freq as line plot
 density_dt <- melt.data.table(freq_dt,
-                id.vars = "cluster",
-                measure.vars = "token"
+    id.vars = "cluster",
+    measure.vars = "token"
 )
 
 freq_density_plot <- ggplot(
     data = density_dt,
-    aes(x = value,
-        #         y = prop_N,
+    aes(
+        x = value,
         group = factor(cluster),
         fill = factor(cluster)
     )
 ) +
-         #          geom_line()
-         #     stat_smooth(method = "lm", formula = y ~ poly(x, 5))
-         geom_density(adjust = 1.5, alpha = 0.4)
-#     geom_col()
-ggsave(filename = str_glue("../plots/{job_id}_freq_density.pdf"),
-       plot = freq_density_plot
+    geom_density(adjust = 1.5, alpha = 0.4)
+
+ggsave(
+    filename = str_glue("../plots/{job_id}_freq_density.pdf"),
+    plot = freq_density_plot
 )
 
 
 ################################################################################
 # take the top n of each cluster
 # and do stats on it
-top_n <- 50
+top_n <- 20
 cutoff_dt <- freq_dt[, .SD[order(-N)][1:top_n], by = cluster]
 cutoff_dt[, cluster_rank := rank(prop_N), by = cluster]
 cutoff_dt[, token := as.integer(token)]
@@ -198,7 +195,8 @@ cutoff_dt
 
 freq_plot <- ggplot(
     data = cutoff_dt,
-    aes(x = token,
+    aes(
+        x = factor(token),
         y = factor(cluster),
         size = prop_N,
         label = prop_labels,
@@ -208,12 +206,14 @@ freq_plot <- ggplot(
     geom_point() +
     #     geom_text(vjust = -2, size = 3, color = "black") +
     scale_color_gradient(low = "lightblue", high = "darkblue") +
-    scale_y_discrete(name = "Clusters",
-                     limits = factor(clusters)) +
+    scale_y_discrete(
+        name = "Clusters",
+        limits = factor(clusters)
+    ) +
     xlab("Tokens") +
     ggtitle(str_glue("Token Usage among clusters: Top {top_n} tokens")) +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 ggsave(
     filename = str_glue("../plots/{job_id}_5_24_0_13-15_raw_token_usage_top{top_n}.pdf"),
@@ -222,7 +222,7 @@ ggsave(
     height = 7
 )
 ggsave(
-    filename = str_glue("../plots/{job_id}_5_24_0_13-15_prop_token_usage_top{top_n}.pdf"),
+    filename = str_glue("../plots/{job_id}_5_2_0_14-17_prop_token_usage_top{top_n}.pdf"),
     plot = freq_plot,
     width = 20,
     height = 10
@@ -231,10 +231,15 @@ ggsave(
 
 # getting the sequence of the top_n tokens
 cutoff_dt <- vocab_dt[cutoff_dt]
-fwrite(x = cutoff_dt,
-       file = str_glue("../proc/{job_id}_7_clusters_{top_n}_tokens_sequence.tsv"),
-       sep = "\t"
+fwrite(
+    x = cutoff_dt,
+    file = str_glue("../proc/{job_id}_7_clusters_{top_n}_tokens_sequence.tsv"),
+    sep = "\t"
 )
+cutoff_dt <- fread(str_glue("../proc/{job_id}_7_clusters_50_tokens_sequence.tsv"))
+cutoff_dt
+
+cutoff_dt[cluster_rank <= 20]
 
 
 ################################################################################
@@ -259,28 +264,31 @@ occurence_dt
 
 tensor_freq_plot <- ggplot(
     data = occurence_dt,
-    aes(x = factor(token),
+    aes(
+        x = factor(token),
         y = freq,
         color = factor(cluster)
     )
 ) +
     geom_violin() +
-    stat_summary(fun=mean,
-                    colour="darkred",
-                    geom="crossbar",
-                    width = 0.5
-                    ) +
+    stat_summary(
+        fun = mean,
+        colour = "darkred",
+        geom = "crossbar",
+        width = 0.5
+    ) +
     xlab("tokens") +
     facet_grid(~ factor(cluster))
 
 ggsave(tmp_plot,
-       width = 20,
-       height = 9
+    width = 20,
+    height = 9
 )
 
-ggsave(filename = str_glue("../plots/{job_id}_5_24_0_13-15_token_top{top_n}_dist_tensors.pdf"),
-       width = 20,
-       height = 9
+ggsave(
+    filename = str_glue("../plots/{job_id}_5_24_0_13-15_token_top{top_n}_dist_tensors.pdf"),
+    width = 20,
+    height = 9
 )
 
 ################################################################################
@@ -293,7 +301,8 @@ cutoff_dt
 
 freq_plot <- ggplot(
     data = cutoff_dt,
-    aes(x = token,
+    aes(
+        x = token,
         y = factor(cluster),
         size = N,
         label = N,
@@ -303,12 +312,14 @@ freq_plot <- ggplot(
     geom_point() +
     geom_text(vjust = -2, size = 3, color = "black") +
     scale_color_gradient(low = "lightblue", high = "darkblue") +
-    scale_y_discrete(name = "Clusters",
-                     limits = factor(clusters)) +
+    scale_y_discrete(
+        name = "Clusters",
+        limits = factor(clusters)
+    ) +
     xlab("Tokens") +
     ggtitle(str_glue("Token Usage among clusters: Bottom {bottom_n} tokens")) +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 ggsave(
     filename = str_glue("../plots/{job_id}_5_24_0_13-15_raw_bottom{bottom_n}_tokens_usage.pdf"),
@@ -321,7 +332,7 @@ ggsave(
 # reading the vocab dict and making a dt out of it
 raw_dict <- fromJSON(file = "../proc/bpe.json")
 str(raw_dict)
-head(raw_vocab) 
+head(raw_vocab)
 raw_vocab[31775]
 
 
@@ -333,19 +344,20 @@ vocab_dt[, sequence := as.character(sequence)]
 vocab_dt[1:10]
 
 
-fwrite(file = "../proc/bpe_vocab.tsv",
-       sep = "\t",
-       vocab_dt
+fwrite(
+    file = "../proc/bpe_vocab.tsv",
+    sep = "\t",
+    vocab_dt
 )
 
 ################################################################################
 # getting the marker tokens_pooler
-# every iter, it reorders the list to put the current idx 
+# every iter, it reorders the list to put the current idx
 # vec to the top. Then do setdiff in a reduce fashion
 unique_tokens <- imap(pooled_tokens_list, function(cluster, idx) {
     union_tokens <- c(pooled_tokens_list[idx], pooled_tokens_list[-idx])
     reduce(union_tokens, setdiff)
-    })
+})
 
 # sanity check
 str(unique_tokens)
@@ -362,9 +374,10 @@ setnames(
 setkey(unique_tokens_dt, token)
 unique_tokens_dt
 
-fwrite(file = "../proc/unique_tokens_5_24_0_13-15.tsv",
-       unique_tokens_dt,
-       sep ="\t"
+fwrite(
+    file = "../proc/unique_tokens_5_24_0_13-15.tsv",
+    unique_tokens_dt,
+    sep = "\t"
 )
 
 # joining
@@ -377,7 +390,8 @@ unique_tokens_freq_dt[cluster == 0]
 
 freq_plot <- ggplot(
     data = unique_tokens_freq_dt[cluster != 0],
-    aes(x = factor(token),
+    aes(
+        x = factor(token),
         y = factor(cluster),
         size = N,
         label = N,
@@ -387,12 +401,14 @@ freq_plot <- ggplot(
     geom_point() +
     geom_text(vjust = -2, size = 3, color = "black") +
     scale_color_gradient(low = "lightblue", high = "darkblue") +
-    scale_y_discrete(name = "Clusters",
-                     limits = factor(clusters[-3])) +
+    scale_y_discrete(
+        name = "Clusters",
+        limits = factor(clusters[-3])
+    ) +
     xlab("Tokens") +
     ggtitle(str_glue("unique Tokens")) +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 ggsave(
     filename = str_glue("../plots/{job_id}_5_24_0_13-15_unique_tokens.pdf"),
@@ -404,9 +420,10 @@ ggsave(
 
 unique_tokens_freq_dt <- vocab_dt[unique_tokens_freq_dt, on = .(token), nomatch = NULL]
 unique_tokens_freq_dt
-fwrite(file = "../proc/unique_tokens_5_24_0_13-15.tsv",
-       sep = "\t",
-       unique_tokens_freq_dt
+fwrite(
+    file = "../proc/unique_tokens_5_24_0_13-15.tsv",
+    sep = "\t",
+    unique_tokens_freq_dt
 )
 
 
@@ -446,8 +463,7 @@ cls_markers <- cls_markers[, .SD[order(-avg_log2FC)], by = cluster]
 cls_markers
 
 cls_markers[cluster == 5]
-cls_markers[gene == "dim-19"
-            ][order(-avg_log2FC)]
+cls_markers[gene == "dim-19"][order(-avg_log2FC)]
 
 cls_markers[cluster == 48]
 
@@ -460,27 +476,25 @@ n_threads
 plan(multicore, workers = n_threads - 1)
 plan()
 
-vocab_hashtable <- hash(keys = vocab_dt$token,
-                        values = vocab_dt$sequence
+vocab_hashtable <- hash(
+    keys = vocab_dt$token,
+    values = vocab_dt$sequence
 )
 vocab_hashtable[[as.character(6)]]
 
 
 decoder <- decode_tensors(input_tokens, vocab_hashtable)
-cluster_seq <- future_map(cluster_tensors,
+cluster_seq <- future_map(
+    cluster_tensors,
     function(cluster) apply(cluster, 1, decoder)
 )
 str(cluster_seq)
 
 saveRDS(cluster_seq,
-        file = "../proc/cluster_seq.rds"
+    file = "../proc/cluster_seq.rds"
 )
 
-future_imap(cluster_seq,
-           function(cluster, idx) write_fasta(cluster, idx)
+future_imap(
+    cluster_seq,
+    function(cluster, idx) write_fasta(cluster, idx)
 )
-
-
-
-
-

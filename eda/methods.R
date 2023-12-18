@@ -12,13 +12,12 @@ read_datasets <- function(dataset_dir) {
 }
 
 transpose_matrix <- function(read_result_list) {
-
     # unpack list
     embed_dim <- read_result_list[[1]]
     input_tokens <- read_result_list[[2]]
 
     # transpose here
-    embed_dim_tr <- aperm(embed_dim, c(3,2,1))
+    embed_dim_tr <- aperm(embed_dim, c(3, 2, 1))
     input_tokens_tr <- aperm(input_tokens, c(2, 1))
     print("Both matrices transposed!")
 
@@ -28,9 +27,8 @@ transpose_matrix <- function(read_result_list) {
 
 
 read_labels <- function(label_dir) {
-
     labels <- fread(str_glue(label_dir),
-                    header = F
+        header = F
     )
     labels <- unlist(as.vector(labels))
     names(labels) <- NULL
@@ -61,7 +59,6 @@ proc_labels <- function(labels) {
 
 
 extract_tokens <- function(embed_dim) {
-
     function(token_pos) {
         token_stack <- embed_dim[, token_pos, ]
 
@@ -71,9 +68,7 @@ extract_tokens <- function(embed_dim) {
 
 
 select_cluster <- function(so) {
-
     function(idx) {
-
         clst <- subset(so, ident = idx)
         clst_idx <- colnames(clst$RNA@counts)
         clst_idx <- str_replace(clst_idx, "V", "")
@@ -86,10 +81,8 @@ select_cluster <- function(so) {
 
 
 get_cluster_tensors <- function(input_tokens) {
-
     function(clst_idx) {
-
-        cluster_tensors <- input_tokens[clst_idx,]
+        cluster_tensors <- input_tokens[clst_idx, ]
 
 
         return(cluster_tensors)
@@ -98,9 +91,7 @@ get_cluster_tensors <- function(input_tokens) {
 
 
 pool_cluster_tokens <- function(input_tokens) {
-
     function(clst_idx) {
-
         get_tensors <- get_cluster_tensors(input_tokens)
         cluster_tensors <- get_tensors(clst_idx)
         pooled_tokens <- as.vector(cluster_tensors) |>
@@ -113,51 +104,56 @@ pool_cluster_tokens <- function(input_tokens) {
 
 
 check_token_tensor <- function(cluster, token) {
-
     return(cluster %in% token)
 }
 
 
 get_top_tokens_frequency <- function(top_tokens) {
-
     function(cluster) {
         filtered_cluster <- map(top_tokens, function(token) cluster %in% token)
 
         # reshape the flattened vec to matrix
-        filtered_cluster <- map(filtered_cluster,
-                                function(x) matrix(x,
-                                                   nrow = dim(cluster)[1],
-                                                   ncol = dim(cluster)[2]
-                                                   )
+        filtered_cluster <- map(
+            filtered_cluster,
+            function(x) {
+                matrix(x,
+                    nrow = dim(cluster)[1],
+                    ncol = dim(cluster)[2]
+                )
+            }
         )
         filtered_cluster_dt <- map(filtered_cluster, as.data.table)
 
-        occurence_dt <- imap(filtered_cluster_dt,
-                             function(dt, idx) {
-                                 occurence_dt <- data.table(
-                                    token = top_tokens[idx],
-                                    freq = rowSums(dt)
-                                 )
-                             }
+        occurence_dt <- imap(
+            filtered_cluster_dt,
+            function(dt, idx) {
+                occurence_dt <- data.table(
+                    token = top_tokens[idx],
+                    freq = rowSums(dt)
+                )
+            }
         )
         occurence_dt <- reduce(occurence_dt, rbind)
 
 
         return(occurence_dt)
     }
-} 
+}
 
 
 find_tensors_with_tokens <- function(marker_tokens_dt, clusters) {
-
     function(mat, idx) {
         return(
             which(
                 apply(cluster_tensors[[idx]],
-                      MARGIN = 1,
-                      FUN = function(x) sum(marker_tokens_dt[cluster == clusters[idx],
-                                                             token] %in% x)
-                      ) > 0
+                    MARGIN = 1,
+                    FUN = function(x) {
+                        sum(marker_tokens_dt[
+                            cluster == clusters[idx],
+                            token
+                        ] %in% x)
+                    }
+                ) > 0
             )
         )
     }
@@ -165,16 +161,16 @@ find_tensors_with_tokens <- function(marker_tokens_dt, clusters) {
 
 
 decode_tensors <- function(input_tokens, vocab_hashtable) {
-
     function(tensor) {
         # removing special tokens: cls, sep and chr tokens
         proc_tensor <- discard(tensor, function(x) x < 3) |>
-            discard(function(x) x >32000)
+            discard(function(x) x > 32000)
 
         # decoding each token using map
         # then pasting all of them together using reduce
         sequence <- reduce(
-            future_map(proc_tensor,
+            future_map(
+                proc_tensor,
                 function(curr_token) vocab_hashtable[[as.character(curr_token)]]
             ),
             paste0
@@ -187,8 +183,8 @@ decode_tensors <- function(input_tokens, vocab_hashtable) {
 
 
 write_fasta <- function(cluster, cluster_idx) {
-
-    imap(cluster,
+    imap(
+        cluster,
         function(tensor, idx) {
             # write the header
             write(

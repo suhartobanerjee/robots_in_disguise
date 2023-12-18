@@ -4,10 +4,10 @@
 cls_so <- CreateSeuratObject(counts = cls_stack_df)
 cls_so
 cls_so$chrom <- labels_dt$labels
-#cls_so@assays$RNA@counts[1:5, 1:5]
+# cls_so@assays$RNA@counts[1:5, 1:5]
 
 
-#cls_so <- NormalizeData(cls_so, normalization.method = "LogNormalize", scale.factor = 10000)
+# cls_so <- NormalizeData(cls_so, normalization.method = "LogNormalize", scale.factor = 10000)
 
 
 # Identify the 10 most highly variable genes
@@ -26,11 +26,11 @@ ggsave(str_glue("../plots/{job_id}_cls_highly_variable_dimensions.pdf"))
 
 # fake scaling to continue with the rest of the analysis
 cls_so <- ScaleData(cls_so,
-                    do.scale = F,
-                    do.center = F,
-                    features = dims
+    do.scale = F,
+    do.center = F,
+    features = dims
 )
-cls_so@assays$RNA@scale.data[1:5,1:5]
+cls_so@assays$RNA@scale.data[1:5, 1:5]
 
 
 # pca
@@ -56,13 +56,14 @@ umap_plot <- DimPlot(cls_so, reduction = "umap", label = T) + NoLegend()
 ggsave(str_glue("../plots/{job_id}_cls_umap_0.5.pdf"))
 
 umap_plot <- DimPlot(cls_so,
-                     reduction = "umap",
-                     group.by = "chrom"
+    reduction = "umap",
+    group.by = "chrom"
 )
-ggsave(filename = str_glue("../plots/{job_id}_cls_umap_0.5_chrom.pdf"),
-       plot = umap_plot,
-       width = 8,
-       height = 7
+ggsave(
+    filename = str_glue("../plots/{job_id}_cls_umap_0.5_chrom.pdf"),
+    plot = umap_plot,
+    width = 8,
+    height = 7
 )
 
 
@@ -71,9 +72,10 @@ cls_markers <- FindAllMarkers(cls_so)
 cls_markers <- as.data.table(cls_markers)
 cls_markers
 
-fwrite(file = "../proc/cls_markers.tsv",
-       sep = "\t",
-       cls_markers
+fwrite(
+    file = "../proc/cls_markers.tsv",
+    sep = "\t",
+    cls_markers
 )
 
 
@@ -88,7 +90,7 @@ chr_so
 chr_so@assays$RNA@counts[1:5, 1:5]
 
 
-#chr_so <- NormalizeData(chr_so, normalization.method = "LogNormalize", scale.factor = 10000)
+# chr_so <- NormalizeData(chr_so, normalization.method = "LogNormalize", scale.factor = 10000)
 
 
 # Identify the 10 most highly variable genes
@@ -107,12 +109,12 @@ ggsave(str_glue("../plots/{job_id}_chr_highly_variable_dimensions.pdf"))
 
 # fake scaling to continue with the rest of the analysis
 chr_so <- ScaleData(chr_so,
-                    do.scale = F,
-                    do.center = F,
-                    features = dims
+    do.scale = F,
+    do.center = F,
+    features = dims
 )
 chr_so$chrom <- labels_dt$labels
-chr_so@assays$RNA@scale.data[1:5,1:5]
+chr_so@assays$RNA@scale.data[1:5, 1:5]
 
 
 # pca
@@ -135,17 +137,18 @@ head(Idents(chr_so), 5)
 # umap
 chr_so <- RunUMAP(chr_so, dims = 1:ndims)
 umap_plot <- DimPlot(chr_so, reduction = "umap", label = T) + NoLegend()
-ggsave(filename = str_glue("../plots/{job_id}_chr_umap_0.5.pdf"),
-       plot = umap_plot,
-       width = 7,
-       height = 7
+ggsave(
+    filename = str_glue("../plots/{job_id}_chr_umap_0.5.pdf"),
+    plot = umap_plot,
+    width = 7,
+    height = 7
 )
 
 # colouring by chrom
 umap_plot <- DimPlot(chr_so,
-                     reduction = "umap",
-                     label = T,
-                     group.by = "chrom"
+    reduction = "umap",
+    label = T,
+    group.by = "chrom"
 ) + NoLegend()
 ggsave(str_glue("../plots/{job_id}_chr_umap_0.5_chrom.pdf"))
 
@@ -155,9 +158,10 @@ chr_markers <- FindAllMarkers(chr_so)
 chr_markers <- as.data.table(chr_markers)
 chr_markers
 
-fwrite(file = "../proc/chr_markers.tsv",
-       sep = "\t",
-       chr_markers
+fwrite(
+    file = "../proc/chr_markers.tsv",
+    sep = "\t",
+    chr_markers
 )
 
 
