@@ -26,25 +26,45 @@ str(dig_kar_obj)
 
 
 
-dig_kar_h1 <- generate_skeleton_h1(ideo_dt)
+dig_kar_h1 <- generate_skeleton_h1(dig_kar_obj@ideo_dt)
 dig_kar_h1 <- add_centromere(dig_kar_h1, dig_kar_obj@centro_dt)
 dig_kar_h1 <- add_gaps_h1(dig_kar_h1, dig_kar_obj@gaps_dt)
 
 col <- RColorBrewer::brewer.pal(7, "Dark2")
 names(col) <- paste0("cluster_", c(1:7))
-col
+dig_kar_obj@plotting_options@color_arg <- col
 
 dig_kar_h1 <- generate_info_layer_h1(dig_kar_h1,
-                                     dig_kar_obj@data,
-                                     colors_param = col
+    dig_kar_obj@data,
+    colors_param = dig_kar_obj@plotting_options@color_arg
 )
-dig_kar_h1 <- stitch_skeleton_h1(dig_kar_h1, 
-                                 haplo_label = "Mapping of cluster tensors"
+dig_kar_h1 <- stitch_skeleton_h1(dig_kar_h1,
+    haplo_label = "Mapping of cluster tensors"
 )
 
 setwd("../../robots_in_disguise/eda/")
 save_digital_karyotype(
     dig_kar_h1,
     "clusters",
-    "clusters_7"
+    "clusters_7_woGaps"
 )
+
+dig_kar_obj@data <- dig_kar_obj@data[chrom %in% dig_kar_obj@ideo_dt$chrom]
+plot_dt <- dig_kar_obj@data[, .N, by = .(sv_state, chrom)]
+
+
+ggplot(
+    data = plot_dt,
+    aes(x = chrom,
+        y = N,
+        fill = sv_state,
+    )
+) +
+    geom_col()
+
+ggsave(file = str_glue("../plots/{job_id}_dist_7clusters_chrom.pdf"),
+       width = 10,
+       height = 7
+)
+
+
