@@ -4,7 +4,6 @@ library(data.table)
 library(stringr)
 library(BSgenome.Hsapiens.UCSC.hg38)
 library(purrr)
-library(itertools)
 
 
 
@@ -19,6 +18,13 @@ reader <- initialise_data_reader("data_table")
 dig_kar_obj <- reader("../data/tall_data/TALL03-DEA5.lenient.filtered.txt")
 dig_kar_obj
 dig_kar_obj@data[str_detect(sv_state, "h2")]
+tall_proc <- dig_kar_obj@data
+
+
+# removing complex and idup events
+tall_proc <- tall_proc[!str_detect(sv_state, regex("idup|complex"))]
+str(tall_proc)
+# tall_proc[is.na(mutated_sequence)]
 
 
 # taking only the unique sv segments
@@ -36,8 +42,7 @@ sv_only[, sv_state := str_split_i(sv_state, "_", 1)]
 
 
 # removing complex calls and idup calls for the moment
-sv_only <- sv_only[sv_state != "complex"]
-sv_only <- sv_only[sv_state != "idup"]
+sv_only <- sv_only[!str_detect(sv_state, regex("idup|complex"))]
 str(sv_only)
 
 ################################################################################
@@ -94,11 +99,6 @@ nextElem(iter_obj)
 # getting the original_sequence and mutating accordingly
 sv_only[, .(chrom, start_loc, end_loc, sv_state)]
 
-# getting original ref sequences
-sv_only[, original_sequence := get_seq_for_sv(.SD)]
-str(sv_only)
-
-
 # func to get the original_sequence from ref
 # iterating through the rows and applying this func
 # for every row
@@ -116,26 +116,47 @@ get_seq_for_sv <- function(sv_only_slice) {
 
 }
 
+# getting original ref sequences
+sv_only[, original_sequence := get_seq_for_sv(.SD)]
+tall_proc[, original_sequence := get_seq_for_sv(.SD)]
+
+str(sv_only)
+str(tall_proc)
+
+
+
 ########################################
 # mutation begins here
 
 # inversion of sequences
 sv_only[str_detect(sv_state, "inv"), 
         mutated_sequence := stringi::stri_reverse(original_sequence)]
+tall_proc[str_detect(sv_state, "inv"), 
+        mutated_sequence := stringi::stri_reverse(original_sequence)]
+
 str(sv_only)
+str(tall_proc)
 
 
 # duplicating the sequence
 sv_only[str_detect(sv_state, "^dup"),
         mutated_sequence := str_dup(original_sequence, times = 2)] 
+tall_proc[str_detect(sv_state, "^dup"),
+        mutated_sequence := str_dup(original_sequence, times = 2)] 
+
 str(sv_only)
+str(tall_proc)
 
 
 # deletion of sequences
 sv_only[str_detect(sv_state, "del"),
         mutated_sequence := ""]
+tall_proc[str_detect(sv_state, "del"),
+        mutated_sequence := ""]
+
 sv_only[str_detect(sv_state, "del"), .(chrom, start_loc, end_loc, sv_state, mutated_sequence)]
 str(sv_only)
+str(tall_proc)
 
 ########################################
 
@@ -162,6 +183,44 @@ test_dt
 sv_only_dup_removed <- sv_only[, .SD[!duplicated(.SD$mutated_sequence)],
                                by = .(chrom, start_loc, end_loc)]
 str(sv_only_dup_removed)
+
+################################################################################
+
+
+################################################################################
+# rough test
+check <- copy(tall_proc)
+check[, original_sequence := NULL]
+check[, mutated_sequence := str_sub(mutated_sequence, 1, 5)]
+check[, length(unique(cell_name))]
+
+check[, .(mutated_sequence), by = cell_name]
+tall_proc[, nchar(mutated_sequence), by = cell_name]
+tall_proc[chrom == "chr6", .N, by = cell_name]
+check[, paste0(mutated_sequence, mutated_sequence)]
+check[chrom == "chr6", paste(mutated_sequence, collapse = " "), by = cell_name]
+check[chrom == "chr6" & cell_name == "TALL3x2_DEA5_PE20456"]
+paste(c("abcd", "efgh"), collapse = "")
+
+check <- check[chrom == "chr6"]
+check[, max(end_loc)]
+check[, .SD, by = cell_name]
+
+
+########################################
+# collecting all svs by cell
+# only taking the svs of chr6
+tall_ct6 <- tall_proc[chrom == "chr6", paste(mutated_sequence, collapse = ""), by = cell_name]
+str(tall_ct6)
+
+setDTthreads(16)
+fwrite(file = "../proc/tall_ct6_mutated_seq_amp_del_inv.tsv.gz",
+       sep = "\t",
+       compress = "gzip",
+       x = tall_ct6
+)
+
+########################################
 
 ################################################################################
 
