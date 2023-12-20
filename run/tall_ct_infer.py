@@ -13,6 +13,8 @@ import os
 import multiprocessing as mp
 import random
 import polars as pl
+import h5py
+from torch.utils.data import DataLoader
 
 
 # logging config
@@ -61,9 +63,6 @@ len(seq_arr)
 len(seq_arr[0][0:5])
 seq_arr[2][0:5]
 
-tokens = tokenizer(seq_arr[0])
-tokens = tokens["input_ids"]
-tokens["input_ids"][-1]
 
 
 with mp.Pool(processes=n_cores-1) as pool:
@@ -78,6 +77,7 @@ for chr in tokens_list:
 
 def chunk_to_len(chr):
     return [chr[i:i + (max_seq_len - 2)] for i in range(0, len(chr), (max_seq_len - 2))]
+
 
 max_seq_len = 512
 chunked_tokens = [chunk_to_len(tokens) for tokens in tokens_list]
@@ -127,18 +127,30 @@ len(padded_tokens[0])
 tokens_tensor = torch.tensor(padded_tokens)
 tokens_tensor.shape
 tokens_tensor
+torch.save(tokens_tensor, "../proc/tall_ct6_tokens_tensor.pt")
 
-# saving files
-import h5py
-with h5py.File(f"../proc/tall_ct6_proc_files.h5", "w") as f:
-    f['tokens_tensor'] = tokens_tensor
-    f['cell_list'] = cell_list
+tokens_tensor = torch.load("../proc/tall_ct6_tokens_tensor.pt")
+
+cell_list[0:5]
+
+with open("../proc/tall_ct6_cell_list.txt", "a") as f:
+    [f.write(x + "\n") for x in cell_list]
+
+
 
 # run this with more mem
 # also with batching
+torch.cuda.is_available()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
+loader = DataLoader(tokens_tensor, batch_size = 64, shuffle = False)
 
+model = model.to(device)
 with torch.no_grad():
-  output = model(tokens_tensor, output_hidden_states=True)
+    for batch in loader:
+        input_data = batch.to(device)
+        output = model(input_data, output_hidden_states=True)
+
 print(output.keys())
 output['hidden_states'][-1].shape
 output['hidden_states'][-1][0][0]
